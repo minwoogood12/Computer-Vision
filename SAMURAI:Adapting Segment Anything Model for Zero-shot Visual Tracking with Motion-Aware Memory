@@ -1,0 +1,136 @@
+SAMURAI : Adapting Segment Anything Model for zero-shot visual tracking with Motion-Aware Memory
+							     소프트웨어학부 20212969 김민우
+1.	Abstract
+Sam 2 Limitation -> fast-moving/self-occluding/low memory quality
+Proposed Improvement : SAMURAI -> motion-aware-memory 
+
+2.	Introduction
+SAM : segmentaion tasks to every prompt 
+	(Image)
+SAM 2: streaming memory architecture for long sequence(Video)
+	(appearance similarity  > spatial / temporal, storing irrelevant feaures)
+SAMURAI : motion modeling, hybrid scoring->motion-aware memory(Crowded scenes)
+
+3.	Related Works
+Motion Modeling : 
+1)	Heuristic methods : Kalman Filter
+2)	Learnable motion models : Tracker, MotionTrack, MambaTrack 
+SAMRUAI -> 1 + 2
+
+4.	Revisiting Segment Anything Model 2
+ 
+SAM 2 :
+Image Encoder ->   Memory Attention Layer   ->  Mask Decoder -> Memory Encoder 
+                                           					          ↑
+		        				         Prompt Encoder
+1)	Image Encoder
+Image Embedding : 3 * H * W  -> (3 * H/4 * W/4) * 16 -> (16, 256)
+2)	Memory Attention Layer 
+Self-attention : Current frame embeddings
+Cross-attention : Current frame embeddings(Query) + Memory Bank - Masks/Prompts/Object Pointers(Key, Value)
+3)	Prompt Encoder
+SAM 기반
+GT Bounding box : top-left, bottom-right to Input 
+Sparse / Dense Prompt tokens -> N_tokens X d(256)
+4)	Mask Decoder
+  
+Prompt tokens + image embeddings (Attention)
+	Masks, Affinity Mask Score, Object Prediction, Occlusion score
+Masks : (1, H, W) i = arg max S_mask,I where S_obj,I > 0 (I ∈ [0, N_mask-1])
+Affinity Mask Score(IoU scores) : MAE loss(평균절대오차) 
+Object Prediction : Cross-entropy loss
++ Motion Score (SAMURAI)
+5)	Memory Encoder
+Masks (1, H, W) -> Masks tokens (N * d) : Memory Embedding 
+6)	Memory Bank
+ 
+FIFO Queue(fixed-window) + memory embedding
+5.	Method
+ 
+1)	Kalman Filter(KF) – based motion modeling
+2)	Hybrid scoring system – Affinity and Motion Scores
+	Not fine-tuning, pre-training, VOT Performance ↑
+5-1. Motion Modeling
+1)	State Vector 
+X = [x, y, w, h, _x, _y, _w, _h]ᵀ
+x, y : center of bounding box
+w, h : width and height of bounding box
+_x, _y, _w, _h : velocities
+2)	State prediction
+  
+F : State Transition Matrix
+3)	KF-IoU Score
+  
+M : Mask
+4)	Select Mask – Hybrid Scores
+ 
+M_* : Final Mask 
+M_i : candidate Masks
+S_kf : Motion Score
+S_mask(M_i) : Affinity Score
+a_kf : weight parameter (0~1)
+5)	Update 
+ 
+z_t : Measurement of the bounding box
+K_t : Kalman Gain (Adjusting confidence of prediction and measure)
+H : Observation matrix
+	Maintain a stable motion state when tracking object is being successfully
+
+4-2. Motion-Aware Memory Selection
+SAM 2 : Most recent frames  
+	Weakness of occlusion or deformation
+SAMURAI : Ideal candidate frames
+	Use Three Scores – Affinity, Object, Motion Score
+ 
+B_t : Memory Bank
+N_max : Maximum number of frames (SAM 2 = 7)
+
+6.	Experiments
+6-1. Benchmarks
+1.	LaSOT : Visual object tracking dataset (basic training)
+2.	LaSot_ext : LaSOT + 150 additional video sequences (strong training)
+3.	GOT-10k : Real-world tracking objects (zero-shot evalutaion)
+4.	TrackingNet : Large-scale tracking dataset (whild contexts)
+5.	NFS : Tracking dataset from hight frame rate videos (high FPS)
+6.	OTB100 : One of the earliest visual tracking benchmarks (classic baseline)
+Visual object tracking results on LaSot, LaSot_ext, GOT-10k
+
+
+
+
+
+ 
+Visual object tracking results on AUC(%) with TrackingNet, NFS, and OTB100
+ 
+Ablation on the effectiveness of the proposed modules
+ 
+Ablation on the sensitivity of the motion weight a_kf
+ 
+Visual object tracking results of the proposed SAMURAI compare to the baseline SAM-based tracking method
+ 
+Attribute-wise AUC(%) Results for LaSOT and LaSOT_ext
+ 
+AUC(%) : Area Under Curve (IoU performance)
+P(%) : Precision (Distance of precision center and GT center <= 20)
+P_norm(%) : Normalized Precision (Normalized P(%)) 
+AO : Average Overlap 
+OP_0.5(%) : Overlap Precision at IoU >= 0.5 
+OP_0.75(%) : Overlap Precision at IoU >= 0.75
+7.	Conclusion
+SAMURAI : 
+1)	Motion based score for better mask prediction
+2)	Memory selection to deal with self-occlusion and crowded scenes
+	Consistent Improvement on all of the SAM models and VOT benchmarks
+	Not Require re-training and fine-tuning 
+
+8.	Limitations and Future Research
+
+1.	Prompt-free Tracking
+•	No manual prompt input
+•	Automatic object selection
+•	Attention-based importance tracking
+2.	Long-term Temporal Consistency
+•	Persistent identity across long sequences
+•	Memory-efficient sequence modeling
+•	Neural State Space Model (SSM) base architectures
+
