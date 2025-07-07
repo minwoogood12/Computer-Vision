@@ -94,11 +94,6 @@ N_max : Maximum number of frames (SAM 2 = 7)
 5.	NFS : Tracking dataset from hight frame rate videos (high FPS)
 6.	OTB100 : One of the earliest visual tracking benchmarks (classic baseline)
 Visual object tracking results on LaSot, LaSot_ext, GOT-10k
-
-
-
-
-
  
 Visual object tracking results on AUC(%) with TrackingNet, NFS, and OTB100
  
