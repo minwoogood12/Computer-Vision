@@ -277,7 +277,7 @@ def calculate_uncertainty(logits): #마스크 GT 있을때만 # 불확실한 부
     return -(torch.abs(gt_class_logits))
 
 
-class VideoSetCriterion(nn.Module):
+class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
     """This class computes the loss for DETR.
     The process happens in two steps:
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
@@ -295,24 +295,30 @@ class VideoSetCriterion(nn.Module):
             losses: list of all the losses to be applied. See get_loss for list of available losses.
         """
         super().__init__()
-        self.num_classes = num_classes
-        self.matcher = matcher
-        self.weight_dict = weight_dict
-        self.eos_coef = eos_coef
-        self.losses = losses
-        empty_weight = torch.ones(self.num_classes + 1)
-        empty_weight[-1] = self.eos_coef
-        self.register_buffer("empty_weight", empty_weight)
+        self.num_classes = num_classes #카테고리 클래스 수 
+        self.matcher = matcher #매칭 비용 모듈
+        self.weight_dict = weight_dict #loss별 가중치 
+        self.eos_coef = eos_coef #배경 클래스 가중치
+        self.losses = losses #계산할 로스 이름 리스트
+        empty_weight = torch.ones(self.num_classes + 1) # 클래스 개수 +1한 텐서 만듬 : [1,1,1,1,1,1,?] ?는 배경
+        empty_weight[-1] = self.eos_coef # 배경의 대한 가중치를 다르게 설정
+        self.register_buffer("empty_weight", empty_weight) #모델에 설정 / 학습 안됨
 
-        # pointwise mask loss parameters
-        self.num_points = num_points
-        self.oversample_ratio = oversample_ratio
-        self.importance_sample_ratio = importance_sample_ratio
+        # pointwise mask loss parameters #이거는 마스크 GT기반에서 샘플 k개 뽑을때 사용
+        self.num_points = num_points #포인트 샘플 개수
+        self.oversample_ratio = oversample_ratio #불확실 포인트 샘플 비율
+        self.importance_sample_ratio = importance_sample_ratio #중요도 기반 포인트 비율
 
-        self._warmup_iters = 2000
-        self.register_buffer("_iter", torch.zeros([1]))
+        self._warmup_iters = 2000 #학습 워밍업 스텝 수 
+        self.register_buffer("_iter", torch.zeros([1])) #학습의 진행도 추적 버퍼
 
-    def loss_labels(self, outputs, targets, indices, num_masks):
+    def loss_labels(self, outputs, targets, indices, num_masks): #클래스 예측 Loss 계산
+        #outputs 모델 출력 딕셔너리 
+        #pred_logits(B, Q, C+1) : (B, Q, 256) => 선형변환 => +1 => (B, Q, C+1) => softmax를 통해 
+        #pred_boxes(B, Q, 4] : (B, Q, 256) => MLP => (B, Q, 4)
+        #pred_masks [B, Q, H ,W] / [B, 1, H, W]
+        #targets GT, 박스 리스트
+        
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
@@ -328,6 +334,54 @@ class VideoSetCriterion(nn.Module):
 
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
         losses = {"loss_ce": loss_ce}
+        return losses
+        
+    def loss_masks(self, outputs, targets, indices, num_masks):
+        """Compute the losses related to the masks: the focal loss and the dice loss.
+        targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
+        """
+        assert "pred_masks" in outputs
+
+        src_idx = self._get_src_permutation_idx(indices)
+        src_masks = outputs["pred_masks"]
+        src_masks = src_masks[src_idx]
+        # Modified to handle video
+        target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks)
+
+        # No need to upsample predictions as we are using normalized coordinates :)
+        # NT x 1 x H x W
+        src_masks = src_masks.flatten(0, 1)[:, None]
+        target_masks = target_masks.flatten(0, 1)[:, None]
+        
+        with torch.no_grad():
+            # sample point_coords
+            point_coords = get_uncertain_point_coords_with_randomness(
+                src_masks,
+                lambda logits: calculate_uncertainty(logits),
+                self.num_points,
+                self.oversample_ratio,
+                self.importance_sample_ratio,
+            )
+            # get gt labels
+            point_labels = point_sample(
+                target_masks,
+                point_coords,
+                align_corners=False,
+            ).squeeze(1)
+
+        point_logits = point_sample(
+            src_masks,
+            point_coords,
+            align_corners=False,
+        ).squeeze(1)
+
+        losses = {
+            "loss_mask": sigmoid_ce_loss_jit(point_logits, point_labels, num_masks),
+            "loss_dice": dice_loss_jit(point_logits, point_labels, num_masks),
+        }
+
+        del src_masks
+        del target_masks
         return losses
     
    
