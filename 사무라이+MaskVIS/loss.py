@@ -212,7 +212,9 @@ class MultiStepMultiMasksAndIous(nn.Module):
         assert len(object_score_logits_list) == len(ious_list)
 
         # accumulate the loss over prediction steps
-        losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0}
+        ##추가##
+        losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_porj" : 0, "loss_pairwise" : 0}
+        ##추가##
         for src_masks, ious, object_score_logits in zip(
             src_masks_list, ious_list, object_score_logits_list
         ):
@@ -227,6 +229,19 @@ class MultiStepMultiMasksAndIous(nn.Module):
     ):
         target_masks = target_masks.expand_as(src_masks)
         # get focal, dice and iou loss on all output masks in a prediction step
+        ####loss_tk추가####
+        #loss_tk = 
+        ####loss_tk추가####
+
+        ####loss_proj추가####
+        #loss_proj = 
+        ####loss_proj추가####
+
+        ####loss_pairwise추가####
+        #loss_pairwise = 
+        ####loss_pairwise추가####
+
+        
         loss_multimask = sigmoid_focal_loss(
             src_masks,
             target_masks,
@@ -293,15 +308,27 @@ class MultiStepMultiMasksAndIous(nn.Module):
             loss_iou = loss_multiiou
 
         # backprop focal, dice and iou loss only if obj present
+
         loss_mask = loss_mask * target_obj
         loss_dice = loss_dice * target_obj
         loss_iou = loss_iou * target_obj
-
+        ###추가###
+        loss_tk = loss_tk * target_obj
+        loss_proj = loss_proj * target_obj
+        loss_pairwise = loss_pairwise * target_obj
+        ###추가###
+        
         # sum over batch dimension (note that the losses are already divided by num_objects)
         losses["loss_mask"] += loss_mask.sum()
         losses["loss_dice"] += loss_dice.sum()
         losses["loss_iou"] += loss_iou.sum()
+        ###추가###
+        losses["loss_tk"] += loss_tk.sum()
+        losses["loss_proj"] += loss_proj.sum()
+        losses["loss_pairwise"] += loss_pairwise.sum()
+        ###추가###
         losses["loss_class"] += loss_class
+        
 
     def reduce_loss(self, losses):
         reduced_loss = 0.0
