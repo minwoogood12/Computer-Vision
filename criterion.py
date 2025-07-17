@@ -314,26 +314,60 @@ class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
 
     def loss_labels(self, outputs, targets, indices, num_masks): #클래스 예측 Loss 계산
         #outputs 모델 출력 딕셔너리 
-        #pred_logits(B, Q, C+1) : (B, Q, 256) => 선형변환 => +1 => (B, Q, C+1) => softmax를 통해 
-        #pred_boxes(B, Q, 4] : (B, Q, 256) => MLP => (B, Q, 4)
-        #pred_masks [B, Q, H ,W] / [B, 1, H, W]
-        #targets GT, 박스 리스트
-        
+        #-pred_logits[B, Q, C+1] : [B, Q, 256] => 선형변환 => +1 => [B, Q, C+1] => softmax를 통해 
+        #-pred_boxes [B, Q, 4] : [B, Q, 256] => MLP => [B, Q, 4]
+        #-pred_masks [B, Q, H ,W] / [B, Q, 256] => MLP(의미있는차원변환) => [B, Q, 256] => 내적[B,Q,256]/pixel_feature[B, 256, H, W] => mask_logits[B,N,H,W]
+        #targets GT정보 리스트
+        #-labels [num_objects] 1차원 텐서
+        #-boxes [num_objects, 4] 2차원 텐서
+        #-masks [num_objects, H, W] 3차원 텐서 => maskfreevis 사용안함
+        #indices 헝가리안 매칭 결과 리스트 - 쿼리와 GT간 매칭
+        #-ex. indices = [(tensor([0,2]), tensor([1,0])), (tensor([1]), tensor([1]))] => 0번 배치 쿼리 0과 GT 1번 매칭, 0번 배치 쿼리 1과 GT 2번 매칭, 1번 배치 쿼리 1과 GT 1번 매칭
+        #num_masks : 전체 GT 마스크 수
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
-        """
-        assert "pred_logits" in outputs
-        src_logits = outputs["pred_logits"].float()
+        """ 
+        assert "pred_logits" in outputs 
+        #=> 레이블형태무조건 있어야함 왜냐면 레이블 예측이라
+        src_logits = outputs["pred_logits"].float() #클래스 예측을 불러옴
 
-        idx = self._get_src_permutation_idx(indices)
+        idx = self._get_src_permutation_idx(indices) 
+        #여러 쿼리가 gt랑 다 매칭되지는 않았으니까 매칭된 쿼리들만 인덱스형태로만듬
+        #예시 (tensor([0, 0, 1]), tensor([1, 3, 0])) => 0번 배치의 1번인덱스 쿼리 / 0번 배치의 3번인덱스 쿼리 / 1번 배치의 0번 인덱스 쿼리
+        '''
+        # targets: GT dict 리스트 (배치마다 1개씩)
+        targets = [
+            {"labels": tensor([2, 5, 7])},   # batch 0
+            {"labels": tensor([1, 4])}       # batch 1
+        ]
+
+        # Hungarian 매칭 결과: indices
+        indices = [
+            (tensor([0, 2]), tensor([1, 0])),  # batch 0: 예측 0→GT 1, 예측 2→GT 0
+            (tensor([1]), tensor([1]))         # batch 1: 예측 1→GT 1
+        ]
+        '''
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        #정답 마스크들을 순서대로 넣은거 -> 위에서 배치 0 : 0쿼리-1GT , 배치 1 : 1쿼리-1GT 
+        #=> 0배치 0번째 쿼리 1GT=5(정답) 0배치 2번째 쿼리 0GT=2(정답) 1배치 1번째 쿼리 1GT=4(정답)
+        #=> (N) 1차원 텐서로 출력 / 값은 (5,2,4)
         target_classes = torch.full(
             src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device
         )
+        #src_logits.shape[:2] : 3차원 [B, Q, C+1]에서 앞 2개차원만 가져옴 
+        #ex. num_classes(클래스 수): 80일 경우에
+        #만약 (2, 100) 배치크기 2, 쿼리 100개라고 가정하면 이 모든 값에 80을 넣으면
+        #실제로 인덱스 기준으로는 80번쨰 인덱스는 81번째 클래스를 가르키게됨(배경 클래스)
+        #배경으로하는 이유는 100개 쿼리가 모두다 gt랑 매칭되지 않기 떄문에 나머지는 다 배경으로 예측해야함
+        #형태 : [2,100]이고 모두가 다 클래스 개수 80으로 이루어짐
+        
         target_classes[idx] = target_classes_o
-
+        #idx실제 매칭된 쿼리에만 정답을 넣어줌
+        
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
-        losses = {"loss_ce": loss_ce}
+        losses = {"loss_ce": loss_ce}    
+        #cross_entropy진행하고 딕테이션 형태로 반환 => 로스 한꺼번에 관리하려고
+        
         return losses
         
     def loss_masks(self, outputs, targets, indices, num_masks):
@@ -386,8 +420,14 @@ class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
     
    
     def topk_mask(self, images_lab_sim, k):
+        #images_lab_sim : [B, N, H, W]크기의 텐서 ? 확실하지않음
+        #K 상위 k개 선택
         images_lab_sim_mask = torch.zeros_like(images_lab_sim)
+        #[B, N, H, W] 같은 크기의 텐서를 만들고 0으로 채움
+        
         topk, indices = torch.topk(images_lab_sim, k, dim =1) # 1, 3, 5, 7
+            
+    
         images_lab_sim_mask = images_lab_sim_mask.scatter(1, indices, topk)
         return images_lab_sim_mask
 
