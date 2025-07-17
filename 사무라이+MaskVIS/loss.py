@@ -213,7 +213,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
 
         # accumulate the loss over prediction steps
         ##추가##
-        losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_porj" : 0, "loss_pairwise" : 0}
+        losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_proj" : 0, "loss_pairwise" : 0}
         ##추가##
         for src_masks, ious, object_score_logits in zip(
             src_masks_list, ious_list, object_score_logits_list
