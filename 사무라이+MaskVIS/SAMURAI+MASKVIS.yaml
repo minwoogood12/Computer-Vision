@@ -177,6 +177,7 @@ trainer:
     use_mlp_for_obj_ptr_proj: true
     # Compilation flag
     # compile_image_encoder: False
+    ##추가##
     # SAMURAI
     samurai_mode: true
     stable_frames_threshold: 15
@@ -186,6 +187,7 @@ trainer:
     memory_bank_iou_threshold: 0.5
     memory_bank_obj_score_threshold: 0.0
     memory_bank_kf_score_threshold: 0.0
+    ##추가##
     
     ####### Training specific params #######
     # box/point input and corrections
@@ -297,6 +299,11 @@ trainer:
         loss_dice: 1
         loss_iou: 1
         loss_class: 1
+        ##추가##
+        loss_tk : 5
+        loss_proj : 2
+        loss_pairwise : 2
+        ##추가##
       supervise_all_iou: true
       iou_use_l1_loss: true
       pred_obj_scores: true
