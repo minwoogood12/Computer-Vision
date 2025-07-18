@@ -107,10 +107,10 @@ losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_
     ##추가##
 
 
-3-5. _forward 함수 내부에서 "tk, proj, pairwise_loss"를 불러와서 losses 딕셔너리에 더해줌
+3-5. forward 함수 마지막 부분에서 "tk, proj, pairwise_loss"를 계산하고 losses 딕셔너리에 더해줌
 ##추가##
         loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
-            outputs, targets, num_objects,
+            src_masks_list, targets_masks, num_objects,
             images_lab_sim,
             images_lab_sim_nei,
             images_lab_sim_nei1,
@@ -124,6 +124,9 @@ losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_
         losses["loss_tk"] += loss_tk
         losses["loss_proj"] += loss_proj
         losses["loss_pairwise"] += loss_pairwise
+        loss_sum = loss_tk + loss_proj + loss_pairwise
+        losses[CORE_LOSS_KEY] += loss_sum
+                   
         ##추가##
 
 3-6. 
