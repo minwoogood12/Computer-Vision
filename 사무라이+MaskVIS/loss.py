@@ -236,20 +236,25 @@ class MultiStepMultiMasksAndIous(nn.Module):
         return losses
 
     def _update_losses(
-        self, losses, src_masks, target_masks, ious, num_objects, object_score_logits
+        self, losses, src_masks, target_masks, ious, num_objects, object_score_logits,
+        ##추가##
+        loss_tk,
+        loss_proj,
+        loss_pairwise
+        ##추가##
     ):
         target_masks = target_masks.expand_as(src_masks)
         # get focal, dice and iou loss on all output masks in a prediction step
         ####loss_tk추가####
-        #loss_tk = 
+        loss_tk = loss_tk
         ####loss_tk추가####
 
         ####loss_proj추가####
-        #loss_proj = 
+        loss_proj = loss_tk
         ####loss_proj추가####
 
         ####loss_pairwise추가####
-        #loss_pairwise = 
+        loss_pairwise = loss_pairwise
         ####loss_pairwise추가####
 
         
