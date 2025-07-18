@@ -269,11 +269,11 @@ class VideoSetCriterion(nn.Module):
         """
         assert "pred_masks" in outputs
 
-        src_idx = self._get_src_permutation_idx(indices)
-        src_masks = outputs["pred_masks"]
-        src_masks = src_masks[src_idx]
+        src_idx = self._get_src_permutation_idx(indices) ####################
+        src_masks = outputs["pred_masks"] #######################
+        src_masks = src_masks[src_idx]      #이거는 [num_matched , T, H ,W]
         # Modified to handle video
-        target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks)
+        target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks) #이거는 [num_matched, T, H, W]
 
         # No need to upsample predictions as we are using normalized coordinates :)
         # NT x 1 x H x W
@@ -316,8 +316,9 @@ class VideoSetCriterion(nn.Module):
         topk, indices = torch.topk(images_lab_sim, k, dim =1) # 1, 3, 5, 7
         images_lab_sim_mask = images_lab_sim_mask.scatter(1, indices, topk)
         return images_lab_sim_mask
-
-    def loss_masks_proj(self, outputs, targets, indices, num_masks, images_lab_sim, images_lab_sim_nei, images_lab_sim_nei1, images_lab_sim_nei2, images_lab_sim_nei3, images_lab_sim_nei4):
+    ##추가##
+    def loss_masks_proj(self, outputs, targets, indices, num_masks, images_lab_sim, images_lab_sim_nei, images_lab_sim_nei1, images_lab_sim_nei2, images_lab_sim_nei3, images_lab_sim_nei4,images_lab_sim_nei5, images_lab_sim_nei6, images_lab_sim_nei7):
+    ##추가##    
         """Compute the losses related to the masks: the focal loss and the dice loss.
         targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
         """
@@ -325,37 +326,55 @@ class VideoSetCriterion(nn.Module):
         
         self._iter += 1
 
-        src_idx = self._get_src_permutation_idx(indices)
-        src_masks = outputs["pred_masks"]
-        src_masks = src_masks[src_idx]
+        src_idx = self._get_src_permutation_idx(indices) #######################
+        src_masks = outputs["pred_masks"] #######################
+        src_masks = src_masks[src_idx] #이거는 [num_matched , T, H ,W] Num_match : t프레임 기간동아 매칭된 마스크 수 
         # Modified to handle video
-        target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks)
+        target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks) #이거는 [num_matched , T, H ,W]
 
-        images_lab_sim = torch.cat(images_lab_sim, dim =0)
-        images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0)
+        images_lab_sim = torch.cat(images_lab_sim, dim =0)    # 영상수 10 프레임 16일때 [160 * (k-1, h,w)] => [160,k-1,h,w]
+        images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0) #[10 * (h*w , k)] => [10, h*w, k]
         images_lab_sim_nei1 = torch.cat(images_lab_sim_nei1, dim=0)
         images_lab_sim_nei2 = torch.cat(images_lab_sim_nei2, dim=0)
         images_lab_sim_nei3 = torch.cat(images_lab_sim_nei3, dim=0)
         images_lab_sim_nei4 = torch.cat(images_lab_sim_nei4, dim=0)
+        ##추가##
+        images_lab_sim_nei5 = torch.cat(images_lab_sim_nei5, dim=0)
+        images_lab_sim_nei6 = torch.cat(images_lab_sim_nei6, dim=0)
+        images_lab_sim_nei7 = torch.cat(images_lab_sim_nei7, dim=0)
+        ##추가##
 
         images_lab_sim = images_lab_sim.view(-1, target_masks.shape[1], images_lab_sim.shape[-3], images_lab_sim.shape[-2], images_lab_sim.shape[-1])
-        images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1)
+        #[160,h,w, k-1] => [10, 16,k-1,h,w]
+        images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1)  #[10, h*w, k] = > [10, 1, h*w , k]
         images_lab_sim_nei1 = images_lab_sim_nei1.unsqueeze(1)
         images_lab_sim_nei2 = images_lab_sim_nei2.unsqueeze(1)
         images_lab_sim_nei3 = images_lab_sim_nei3.unsqueeze(1)
         images_lab_sim_nei4 = images_lab_sim_nei4.unsqueeze(1)
+        ##추가##
+        images_lab_sim_nei5 = images_lab_sim_nei5.unsqueeze(1)
+        images_lab_sim_nei6 = images_lab_sim_nei6.unsqueeze(1)
+        images_lab_sim_nei7 = images_lab_sim_nei7.unsqueeze(1)
+        ##추가##
 
-        if len(src_idx[0].tolist()) > 0:
+        if len(src_idx[0].tolist()) > 0: ##k개 고르기
             images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
+            #[10, 16,k-1,h,w] => [num_matched * T, h,w,k-1]
             images_lab_sim_nei = self.topk_mask(torch.cat([images_lab_sim_nei[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            #[10, 1, h*w , k]=> [num_matched, h*w, topk]
             images_lab_sim_nei1 = self.topk_mask(torch.cat([images_lab_sim_nei1[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei2 = self.topk_mask(torch.cat([images_lab_sim_nei2[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei3 = self.topk_mask(torch.cat([images_lab_sim_nei3[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei4 = self.topk_mask(torch.cat([images_lab_sim_nei4[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
-
+            ##추가##
+            images_lab_sim_nei5 = self.topk_mask(torch.cat([images_lab_sim_nei5[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei6 = self.topk_mask(torch.cat([images_lab_sim_nei6[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei7 = self.topk_mask(torch.cat([images_lab_sim_nei7[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            ##추가##
+                
         k_size = 3 
 
-        if src_masks.shape[0] > 0:
+        if src_masks.shape[0] > 0: ########pairwise loss구하기########
             pairwise_losses_neighbor = compute_pairwise_term_neighbor(
                 src_masks[:,:1], src_masks[:,1:2], k_size, 3
             ) 
