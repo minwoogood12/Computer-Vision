@@ -171,7 +171,18 @@ class MultiStepMultiMasksAndIous(nn.Module):
         self.iou_use_l1_loss = iou_use_l1_loss
         self.pred_obj_scores = pred_obj_scores
 
-    def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor):
+    def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
+                ##추가##
+                images_lab_sim, 
+                images_lab_sim_nei,
+                images_lab_sim_nei2,
+                images_lab_sim_nei3,
+                images_lab_sim_nei4,
+                images_lab_sim_nei5,
+                images_lab_sim_nei6,
+                images_lab_sim_nei7,
+                ##추가##
+               ):
         assert len(outs_batch) == len(targets_batch)
         num_objects = torch.tensor(
             (targets_batch.shape[1]), device=targets_batch.device, dtype=torch.float
