@@ -171,6 +171,15 @@ class MultiStepMultiMasksAndIous(nn.Module):
         self.iou_use_l1_loss = iou_use_l1_loss
         self.pred_obj_scores = pred_obj_scores
 
+
+        '''out_batch : outputs: Dict[str, Any] = {
+                "multistep_pred_multimasks_high_res": List[Tensor of shape [B, M, H, W]], 프레임 개수만큼 리스트 만들어짐  b: 배치 개수 M은 마스크 예측 개수
+                "multistep_pred_ious": List[Tensor of shape [B, M]],
+                "multistep_object_score_logits": List[Tensor of shape [B, 1]],
+                ...
+            }
+            targets_batch: Tensor of shape [T, N, H, W] T: 프레임수 N : 프레임당 객체수 
+        '''
     def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
                 ##추가##
                 images_lab_sim, 
@@ -196,10 +205,12 @@ class MultiStepMultiMasksAndIous(nn.Module):
             cur_losses = self._forward(outs, targets, num_objects)
             for k, v in cur_losses.items():
                 losses[k] += v
-
+       
         return losses
     
     def _forward(self, outputs: Dict, targets: torch.Tensor, num_objects):
+        outputs : Dict("multi ~~' : [B,M,H,W], ......) 
+        targets : [N, H, W]
         """
         Compute the losses related to the masks: the focal loss and the dice loss.
         and also the MAE or MSE loss between predicted IoUs and actual IoUs.
@@ -214,11 +225,20 @@ class MultiStepMultiMasksAndIous(nn.Module):
         """
 
         target_masks = targets.unsqueeze(1).float()
+        #target_masks : [N, 1, H, W]
+        
         assert target_masks.dim() == 4  # [N, 1, H, W]
-        src_masks_list = outputs["multistep_pred_multimasks_high_res"]
-        ious_list = outputs["multistep_pred_ious"]
-        object_score_logits_list = outputs["multistep_object_score_logits"]
 
+        
+        src_masks_list = outputs["multistep_pred_multimasks_high_res"]
+        #src_masks_list : [B, M, H, W]
+        
+        ious_list = outputs["multistep_pred_ious"]
+        #몰라도됨.
+        
+        object_score_logits_list = outputs["multistep_object_score_logits"]
+        #몰라도됨.
+        
         assert len(src_masks_list) == len(ious_list)
         assert len(object_score_logits_list) == len(ious_list)
 
@@ -234,7 +254,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
             )
         ##추가##
         loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
-            outputs, targets, num_objects,
+            src_masks_list, targets_masks, num_objects,
             images_lab_sim,
             images_lab_sim_nei,
             images_lab_sim_nei1,
