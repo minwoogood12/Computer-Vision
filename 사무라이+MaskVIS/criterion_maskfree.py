@@ -388,24 +388,40 @@ class VideoSetCriterion(nn.Module):
                 src_masks[:,3:4], src_masks[:,4:5], k_size, 3
             )
             pairwise_losses_neighbor4 = compute_pairwise_term_neighbor(
-                src_masks[:,4:5], src_masks[:,0:1], k_size, 3
+                src_masks[:,4:5], src_masks[:,5:6], k_size, 3
             )
+            ##추가##
+            pairwise_losses_neighbor5 = compute_pairwise_term_neighbor(
+                src_masks[:,5:6], src_masks[:,6:7], k_size, 3
+            )
+            pairwise_losses_neighbor6 = compute_pairwise_term_neighbor(
+                src_masks[:,6:7], src_masks[:,7:8], k_size, 3
+            )
+            pairwise_losses_neighbor7 = compute_pairwise_term_neighbor(
+                src_masks[:,7:8], src_masks[:,0:1], k_size, 3
+            )
+            ##추가##
             
         # print('pairwise_losses_neighbor:', pairwise_losses_neighbor.shape)
         src_masks = src_masks.flatten(0, 1)[:, None]
+        # [num_matched, T, H, W]=> [num_matched * T, 1, H, W]
         target_masks = target_masks.flatten(0, 1)[:, None]
+        # [num_matched, T, H, W]=> [num_matched * T, 1, H, W]
         target_masks = F.interpolate(target_masks, (src_masks.shape[-2], src_masks.shape[-1]), mode='bilinear')
         # images_lab_sim = F.interpolate(images_lab_sim, (src_masks.shape[-2], src_masks.shape[-1]), mode='bilinear')
         
         
-        if src_masks.shape[0] > 0:
+        if src_masks.shape[0] > 0: #예측된 마스크있을떄 
             loss_prj_term = compute_project_term(src_masks.sigmoid(), target_masks)  
+            #loss_proj계산
 
             pairwise_losses = compute_pairwise_term(
                 src_masks, k_size, 2
-            )
+            ) 
+            #pairwise_losses 손실 측정
 
             weights = (images_lab_sim >= 0.3).float() * target_masks.float()
+            #가중치
             target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], 5, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
             
             target_masks_sum = (target_masks_sum >= 1.0).float() # ori is 1.0
@@ -414,7 +430,12 @@ class VideoSetCriterion(nn.Module):
             weights_neighbor2 = (images_lab_sim_nei2 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
             weights_neighbor3 = (images_lab_sim_nei3 >= 0.05).float() * target_masks_sum
             weights_neighbor4 = (images_lab_sim_nei4 >= 0.05).float() * target_masks_sum
-
+            ##추가##
+            weights_neighbor5 = (images_lab_sim_nei5 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
+            weights_neighbor6 = (images_lab_sim_nei6 >= 0.05).float() * target_masks_sum
+            weights_neighbor7 = (images_lab_sim_nei7 >= 0.05).float() * target_masks_sum
+            ##추가##
+            
             warmup_factor = min(self._iter.item() / float(self._warmup_iters), 1.0) #1.0
 
             loss_pairwise = (pairwise_losses * weights).sum() / weights.sum().clamp(min=1.0)
@@ -423,7 +444,12 @@ class VideoSetCriterion(nn.Module):
             loss_pairwise_neighbor2 = (pairwise_losses_neighbor2 * weights_neighbor2).sum() / weights_neighbor2.sum().clamp(min=1.0) * warmup_factor
             loss_pairwise_neighbor3 = (pairwise_losses_neighbor3 * weights_neighbor3).sum() / weights_neighbor3.sum().clamp(min=1.0) * warmup_factor
             loss_pairwise_neighbor4 = (pairwise_losses_neighbor4 * weights_neighbor4).sum() / weights_neighbor4.sum().clamp(min=1.0) * warmup_factor
-
+            ##추가##
+            loss_pairwise_neighbor5 = (pairwise_losses_neighbor5 * weights_neighbor5).sum() / weights_neighbor5.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor6 = (pairwise_losses_neighbor6 * weights_neighbor6).sum() / weights_neighbor6.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor7 = (pairwise_losses_neighbor7 * weights_neighbor7).sum() / weights_neighbor7.sum().clamp(min=1.0) * warmup_factor
+            #추가##
+        
         else:
             loss_prj_term = src_masks.sum() * 0.
             loss_pairwise = src_masks.sum() * 0.
@@ -432,12 +458,19 @@ class VideoSetCriterion(nn.Module):
             loss_pairwise_neighbor2 = src_masks.sum() * 0.
             loss_pairwise_neighbor3 = src_masks.sum() * 0.
             loss_pairwise_neighbor4 = src_masks.sum() * 0.
+            ##추가##
+            loss_pairwise_neighbor5 = src_masks.sum() * 0.
+            loss_pairwise_neighbor6 = src_masks.sum() * 0.
+            loss_pairwise_neighbor7 = src_masks.sum() * 0.
+            ##추가##
 
         # print('loss_proj term:', loss_prj_term)
         losses = {
             "loss_mask": loss_prj_term,
             "loss_bound": loss_pairwise,
-            "loss_bound_neighbor": (loss_pairwise_neighbor + loss_pairwise_neighbor1 + loss_pairwise_neighbor2 + loss_pairwise_neighbor3 + loss_pairwise_neighbor4) * 0.1, # * 0.33
+            ##추가##
+            "loss_bound_neighbor": (loss_pairwise_neighbor + loss_pairwise_neighbor1 + loss_pairwise_neighbor2 + loss_pairwise_neighbor3 + loss_pairwise_neighbor4 + loss_pairwise_neighbor5 +  loss_pairwise_neighbor6 +  loss_pairwise_neighbor7) * 0.1, # * 0.33
+            ##추가##
         }
 
         del src_masks
