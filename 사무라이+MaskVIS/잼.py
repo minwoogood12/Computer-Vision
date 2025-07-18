@@ -1,7 +1,10 @@
-수정한 내용
+수정한 내용 07.18
 
 1. 기존 sam2.1_hiera_b+_MOSE_finetune.yaml 학습 yaml파일에
 "사무라이 구조", "tk, proj, pairwise_loss"추가
+
+-------------------------------------------------------------------------------------
+
 2. trainer.py에 원본이미지 받아서 color_similarity구해서 loss로 넘겨주는 코드 추가
 outputs = model(batch)
         targets = batch.masks
@@ -45,6 +48,9 @@ outputs = model(batch)
                               ##추가##
                               )
  => 기존 maskfreevis는 4까지이지만 sam2는 8개 프레임단위이므로 증가시킴
+
+----------------------------------------------------------------------
+
 3. loss.py에 
 
 3-1. "tk, proj, pairwise_loss"추가했는지 검사하는 코드 추가
@@ -54,7 +60,8 @@ if "loss_proj" not in self.weight_dict:
   self.weight_dict["loss_proj"] = 0.0
 if "loss_pairwise" not in self.weight_dict:
   self.weight_dict["loss_pairwise"] = 0.0
-3-3. forward()에 images_lab_sim~images_lab_sim_nei7 인수로 받는 코드 추가
+        
+3-2. forward()에 images_lab_sim~images_lab_sim_nei7 인수로 받는 코드 추가
 def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
                 ##추가##
                 images_lab_sim, 
@@ -68,15 +75,17 @@ def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
                 ##추가##
                ):
 
-3-2. loss딕셔너리에 "tk, proj, pairwise_loss" 추가
+3-3. loss딕셔너리에 "tk, proj, pairwise_loss" 추가
 losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_proj" : 0, "loss_pairwise" : 0}
 
-3-3. 구한 "tk, proj, pairwise_loss" 로스들은 object가 없을시 가중치 0으로 만드는 코드 추가
+3-4. 
+
+3-5. 구한 "tk, proj, pairwise_loss" 로스들은 object가 없을시 가중치 0으로 만드는 코드 추가
 loss_tk = loss_tk * target_obj
 loss_proj = loss_proj * target_obj
 loss_pairwise = loss_pairwise * target_obj
 
-3-4. 최종적으로 구한 "tk, proj, pairwise_loss" loss 딕셔너리에 추가
+3-6. 최종적으로 구한 "tk, proj, pairwise_loss" loss 딕셔너리에 추가
 losses["loss_tk"] += loss_tk.sum()
 losses["loss_proj"] += loss_proj.sum()
 losses["loss_pairwise"] += loss_pairwise.sum()
