@@ -295,14 +295,14 @@ trainer:
     all:
       _target_: training.loss_fns.MultiStepMultiMasksAndIous
       weight_dict:
-        loss_mask: 20
+        loss_mask: 10 #20->10
         loss_dice: 1
         loss_iou: 1
         loss_class: 1
         ##추가##
-        loss_tk : 5
-        loss_proj : 2
-        loss_pairwise : 2
+        loss_tk : 10
+        loss_proj : 5
+        loss_pairwise : 5
         ##추가##
       supervise_all_iou: true
       iou_use_l1_loss: true
