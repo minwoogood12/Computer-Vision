@@ -198,7 +198,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
                 losses[k] += v
 
         return losses
-
+    
     def _forward(self, outputs: Dict, targets: torch.Tensor, num_objects):
         """
         Compute the losses related to the masks: the focal loss and the dice loss.
@@ -232,30 +232,50 @@ class MultiStepMultiMasksAndIous(nn.Module):
             self._update_losses(
                 losses, src_masks, target_masks, ious, num_objects, object_score_logits
             )
+        ##추가##
+        loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
+            outputs, targets, num_objects,
+            images_lab_sim,
+            images_lab_sim_nei,
+            images_lab_sim_nei1,
+            images_lab_sim_nei2,
+            images_lab_sim_nei3,
+            images_lab_sim_nei4,
+            images_lab_sim_nei5,
+            images_lab_sim_nei6,
+            images_lab_sim_nei7
+        )
+        losses["loss_tk"] += loss_tk
+        losses["loss_proj"] += loss_proj
+        losses["loss_pairwise"] += loss_pairwise
+        ##추가##
+        
         losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
         return losses
+    ##추가##
+    def loss_masks_proj(self, outputs, targets, num_objects, 
+                        images_lab_sim, 
+                        images_lab_sim_nei, 
+                        images_lab_sim_nei1, 
+                        images_lab_sim_nei2, 
+                        images_lab_sim_nei3, 
+                        images_lab_sim_nei4,
+                        images_lab_sim_nei5,
+                        images_lab_sim_nei6,
+                        images_lab_sim_nei7
+                       ):
+        loss_tk = 1
+        loss_proj = 2
+        loss_pairwise = 3
 
+        return loss_tk, loss_proj, loss_pairwise
+    ##추가##
+    
     def _update_losses(
-        self, losses, src_masks, target_masks, ious, num_objects, object_score_logits,
-        ##추가##
-        loss_tk,
-        loss_proj,
-        loss_pairwise
-        ##추가##
-    ):
+        self, losses, src_masks, target_masks, ious, num_objects, object_score_logits):
         target_masks = target_masks.expand_as(src_masks)
         # get focal, dice and iou loss on all output masks in a prediction step
-        ####loss_tk추가####
-        loss_tk = loss_tk
-        ####loss_tk추가####
-
-        ####loss_proj추가####
-        loss_proj = loss_tk
-        ####loss_proj추가####
-
-        ####loss_pairwise추가####
-        loss_pairwise = loss_pairwise
-        ####loss_pairwise추가####
+        
 
         
         loss_multimask = sigmoid_focal_loss(
@@ -328,21 +348,13 @@ class MultiStepMultiMasksAndIous(nn.Module):
         loss_mask = loss_mask * target_obj
         loss_dice = loss_dice * target_obj
         loss_iou = loss_iou * target_obj
-        ###추가###
-        loss_tk = loss_tk * target_obj
-        loss_proj = loss_proj * target_obj
-        loss_pairwise = loss_pairwise * target_obj
-        ###추가###
+        
         
         # sum over batch dimension (note that the losses are already divided by num_objects)
         losses["loss_mask"] += loss_mask.sum()
         losses["loss_dice"] += loss_dice.sum()
         losses["loss_iou"] += loss_iou.sum()
-        ###추가###
-        losses["loss_tk"] += loss_tk.sum()
-        losses["loss_proj"] += loss_proj.sum()
-        losses["loss_pairwise"] += loss_pairwise.sum()
-        ###추가###
+        
         losses["loss_class"] += loss_class
         
 
