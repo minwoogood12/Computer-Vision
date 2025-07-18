@@ -5,7 +5,16 @@
 
 -------------------------------------------------------------------------------------
 
-2. trainer.py에 원본이미지 받아서 color_similarity구해서 loss로 넘겨주는 코드 추가
+2. trainer.py에 
+
+2-1. color_similarity구하는 코드 추가
+def unfold_wo_center(x, kernel_size, dilation):
+def unfold_w_center(x, kernel_size, dilation):
+def get_images_color_similarity(images, kernel_size, dilation):
+def get_neighbor_images_color_similarity(images, images_neighbor, kernel_size, dilation):
+def get_neighbor_images_patch_color_similarity(images, images_neighbor, kernel_size, dilation):
+
+2-2. 원본이미지 받아서 color_similarity구해서 loss로 넘겨주는 코드 추가
 outputs = model(batch)
         targets = batch.masks
         batch_size = len(batch.img_batch)
