@@ -88,63 +88,48 @@ def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
 losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_proj" : 0, "loss_pairwise" : 0}
 
 3-4. loss_mask_proj에서 "tk, proj, pairwise_loss" 계산
+ def loss_masks_proj(self, outputs, targets, num_objects, 
+                        images_lab_sim, 
+                        images_lab_sim_nei, 
+                        images_lab_sim_nei1, 
+                        images_lab_sim_nei2, 
+                        images_lab_sim_nei3, 
+                        images_lab_sim_nei4,
+                        images_lab_sim_nei5,
+                        images_lab_sim_nei6,
+                        images_lab_sim_nei7
+                       ):
+        loss_tk = 1
+        loss_proj = 2
+        loss_pairwise = 3
 
-3-5. loss_mask_proj에서 미리 구한 "tk, proj, pairwise_loss"로스들을 _forward를 거쳐 _update_losses에 넣어주는 코드 추가
-cur_losses = self._forward(outs, targets, num_objects,
-                                      ##추가##
-                                      loss_tk,
-                                      loss_proj,
-                                      loss_pairwise
-                                      ##추가##
-                                      )
+        return loss_tk, loss_proj, loss_pairwise
+    ##추가##
 
-def _forward(self, outputs: Dict, targets: torch.Tensor, num_objects,
-                ##추가##
-                loss_tk,
-                loss_proj,
-                loss_pairwise
-                ##추가##
-                ):
 
-self._update_losses(
-                losses, src_masks, target_masks, ious, num_objects, object_score_logits,
-                ##추가##
-                loss_tk,
-                loss_proj,
-                loss_pairwise
-                ##추가##
-
-def _update_losses(
-        self, losses, src_masks, target_masks, ious, num_objects, object_score_logits,
+3-5. _forward 함수 내부에서 "tk, proj, pairwise_loss"를 불러와서 losses 딕셔너리에 더해줌
+##추가##
+        loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
+            outputs, targets, num_objects,
+            images_lab_sim,
+            images_lab_sim_nei,
+            images_lab_sim_nei1,
+            images_lab_sim_nei2,
+            images_lab_sim_nei3,
+            images_lab_sim_nei4,
+            images_lab_sim_nei5,
+            images_lab_sim_nei6,
+            images_lab_sim_nei7
+        )
+        losses["loss_tk"] += loss_tk
+        losses["loss_proj"] += loss_proj
+        losses["loss_pairwise"] += loss_pairwise
         ##추가##
-        loss_tk,
-        loss_proj,
-        loss_pairwise
-        ##추가##
-    ):
-        target_masks = target_masks.expand_as(src_masks)
-        # get focal, dice and iou loss on all output masks in a prediction step
-        ####loss_tk추가####
-        loss_tk = loss_tk
-        ####loss_tk추가####
 
-        ####loss_proj추가####
-        loss_proj = loss_tk
-        ####loss_proj추가####
+3-6. 
 
-        ####loss_pairwise추가####
-        loss_pairwise = loss_pairwise
-        ####loss_pairwise추가####
 
-3-6. 구한 "tk, proj, pairwise_loss" 로스들은 object가 없을시 가중치 0으로 만드는 코드 추가
-loss_tk = loss_tk * target_obj
-loss_proj = loss_proj * target_obj
-loss_pairwise = loss_pairwise * target_obj
-
-3-7. 최종적으로 구한 "tk, proj, pairwise_loss" loss 딕셔너리에 추가
-losses["loss_tk"] += loss_tk.sum()
-losses["loss_proj"] += loss_proj.sum()
-losses["loss_pairwise"] += loss_pairwise.sum()
+3-7. 
 
 3-5. 
 
