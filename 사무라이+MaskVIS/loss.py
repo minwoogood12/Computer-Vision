@@ -9,7 +9,7 @@ from typing import Dict, List
 
 import torch
 import torch.distributed
-import torch.nn as nn
+import torch.nn as nn  
 import torch.nn.functional as F
 
 from training.trainer import CORE_LOSS_KEY
@@ -172,13 +172,18 @@ class MultiStepMultiMasksAndIous(nn.Module):
         self.pred_obj_scores = pred_obj_scores
 
 
-        '''out_batch : outputs: Dict[str, Any] = {
-                "multistep_pred_multimasks_high_res": List[Tensor of shape [B, M, H, W]], 프레임 개수만큼 리스트 만들어짐  b: 배치 개수 M은 마스크 예측 개수
-                "multistep_pred_ious": List[Tensor of shape [B, M]],
-                "multistep_object_score_logits": List[Tensor of shape [B, 1]],
-                ...
-            }
-            targets_batch: Tensor of shape [T, N, H, W] T: 프레임수 N : 프레임당 객체수 
+        '''outs_batch = [
+            {  # 프레임 1
+              "multistep_pred_multimasks_high_res": [Tensor[B, M, H, W], ..., (step 수)],
+              "multistep_pred_ious": [Tensor[B, M], ..., (step 수)],
+              "multistep_object_score_logits": [Tensor[B, 1], ..., (step 수)]
+            },
+            {  # 프레임 2
+                  ...
+            },
+            ...
+            ]  # 길이 = num_frames (예: 8개)
+            targets_batch: Tensor of shape [T, N, H, W] T: 프레임수 N :객체수 ex) 3 
         '''
     def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
                 ##추가##
@@ -205,13 +210,39 @@ class MultiStepMultiMasksAndIous(nn.Module):
             cur_losses = self._forward(outs, targets, num_objects)
             for k, v in cur_losses.items():
                 losses[k] += v
-       
+
+        ##추가##
+        loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
+            src_masks_list, targets_masks, num_objects,
+            images_lab_sim,
+            images_lab_sim_nei,
+            images_lab_sim_nei1,
+            images_lab_sim_nei2,
+            images_lab_sim_nei3,
+            images_lab_sim_nei4,
+            images_lab_sim_nei5,
+            images_lab_sim_nei6,
+            images_lab_sim_nei7
+        )
+        losses["loss_tk"] += loss_tk
+        losses["loss_proj"] += loss_proj
+        losses["loss_pairwise"] += loss_pairwise
+        loss_sum = loss_tk + loss_proj + loss_pairwise
+        losses[CORE_LOSS_KEY] += loss_sum
+                   
+        ##추가##
+                   
         return losses
     
     def _forward(self, outputs: Dict, targets: torch.Tensor, num_objects):
-        outputs : Dict("multi ~~' : [B,M,H,W], ......) 
-        targets : [N, H, W]
+        
         """
+        outputs = {
+            "multistep_pred_multimasks_high_res": [Tensor[B, M, H, W], ...],  # step 수만큼
+            "multistep_pred_ious": [Tensor[B, M], ...],
+            "multistep_object_score_logits": [Tensor[B, 1], ...]
+        }
+        targets.shape = [N, H, W]  # 한 프레임의 GT 마스크들
         Compute the losses related to the masks: the focal loss and the dice loss.
         and also the MAE or MSE loss between predicted IoUs and actual IoUs.
 
@@ -225,13 +256,12 @@ class MultiStepMultiMasksAndIous(nn.Module):
         """
 
         target_masks = targets.unsqueeze(1).float()
-        #target_masks : [N, 1, H, W]
         
         assert target_masks.dim() == 4  # [N, 1, H, W]
-
+        #[Tensor[B, M, H, W], ...],  # step 수만큼
         
         src_masks_list = outputs["multistep_pred_multimasks_high_res"]
-        #src_masks_list : [B, M, H, W]
+        
         
         ious_list = outputs["multistep_pred_ious"]
         #몰라도됨.
@@ -252,23 +282,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
             self._update_losses(
                 losses, src_masks, target_masks, ious, num_objects, object_score_logits
             )
-        ##추가##
-        loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
-            src_masks_list, targets_masks, num_objects,
-            images_lab_sim,
-            images_lab_sim_nei,
-            images_lab_sim_nei1,
-            images_lab_sim_nei2,
-            images_lab_sim_nei3,
-            images_lab_sim_nei4,
-            images_lab_sim_nei5,
-            images_lab_sim_nei6,
-            images_lab_sim_nei7
-        )
-        losses["loss_tk"] += loss_tk
-        losses["loss_proj"] += loss_proj
-        losses["loss_pairwise"] += loss_pairwise
-        ##추가##
+        
         
         losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
         return losses
@@ -295,11 +309,12 @@ class MultiStepMultiMasksAndIous(nn.Module):
         self, losses, src_masks, target_masks, ious, num_objects, object_score_logits):
         target_masks = target_masks.expand_as(src_masks)
         # get focal, dice and iou loss on all output masks in a prediction step
-        
+        #
 
         
         loss_multimask = sigmoid_focal_loss(
             src_masks,
+            #src_masks: Tensor[B, M, H, W]
             target_masks,
             num_objects,
             alpha=self.focal_alpha,
