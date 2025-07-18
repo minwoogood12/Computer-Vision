@@ -572,13 +572,13 @@ class Trainer:
         key = batch.dict_key  # key for dataset
 
         
-        loss = self.loss[key](outputs, targets, 
+        loss = self.loss[key](outputs, targets,
+                              ##추가##
                               images_lab_sim, 
                               images_lab_sim_nei,
                               images_lab_sim_nei2,
                               images_lab_sim_nei3,
                               images_lab_sim_nei4,
-                              ##추가##
                               images_lab_sim_nei5,
                               images_lab_sim_nei6,
                               images_lab_sim_nei7,
