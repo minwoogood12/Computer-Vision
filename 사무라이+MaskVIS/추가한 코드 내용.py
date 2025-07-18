@@ -87,7 +87,33 @@ def forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor,
 3-3. loss딕셔너리에 "tk, proj, pairwise_loss" 추가
 losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0, "loss_tk" : 0, "loss_proj" : 0, "loss_pairwise" : 0}
 
-3-4. 다른 함수에서 미리 구한 "tk, proj, pairwise_loss"로스들을 그대로 _update_losses에 넣어주는 코드 추가
+3-4. loss_mask_proj에서 "tk, proj, pairwise_loss" 계산
+
+3-5. loss_mask_proj에서 미리 구한 "tk, proj, pairwise_loss"로스들을 _forward를 거쳐 _update_losses에 넣어주는 코드 추가
+cur_losses = self._forward(outs, targets, num_objects,
+                                      ##추가##
+                                      loss_tk,
+                                      loss_proj,
+                                      loss_pairwise
+                                      ##추가##
+                                      )
+
+def _forward(self, outputs: Dict, targets: torch.Tensor, num_objects,
+                ##추가##
+                loss_tk,
+                loss_proj,
+                loss_pairwise
+                ##추가##
+                ):
+
+self._update_losses(
+                losses, src_masks, target_masks, ious, num_objects, object_score_logits,
+                ##추가##
+                loss_tk,
+                loss_proj,
+                loss_pairwise
+                ##추가##
+
 def _update_losses(
         self, losses, src_masks, target_masks, ious, num_objects, object_score_logits,
         ##추가##
@@ -110,12 +136,12 @@ def _update_losses(
         loss_pairwise = loss_pairwise
         ####loss_pairwise추가####
 
-3-5. 구한 "tk, proj, pairwise_loss" 로스들은 object가 없을시 가중치 0으로 만드는 코드 추가
+3-6. 구한 "tk, proj, pairwise_loss" 로스들은 object가 없을시 가중치 0으로 만드는 코드 추가
 loss_tk = loss_tk * target_obj
 loss_proj = loss_proj * target_obj
 loss_pairwise = loss_pairwise * target_obj
 
-3-6. 최종적으로 구한 "tk, proj, pairwise_loss" loss 딕셔너리에 추가
+3-7. 최종적으로 구한 "tk, proj, pairwise_loss" loss 딕셔너리에 추가
 losses["loss_tk"] += loss_tk.sum()
 losses["loss_proj"] += loss_proj.sum()
 losses["loss_pairwise"] += loss_pairwise.sum()
