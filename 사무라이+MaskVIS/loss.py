@@ -424,15 +424,13 @@ class MultiStepMultiMasksAndIous(nn.Module):
         losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
         return losses
     ##추가##
-    def convert(outputs, step_idx=-1):
+    def convert(self, outputs, step_idx=-1):
         """
         outputs: List[Dict[str, List[Tensor[1, M, H, W]]]] of length T
         returns: Tensor[N, T, H, W]
         """
         T = len(outputs)
         B, M, H, W = outputs[0]["multistep_pred_multimasks_high_res"][step_idx].shape
-
-       
 
         # 프레임마다 마지막 step의 마스크 예측만 사용
         masks_per_frame = []
@@ -494,6 +492,24 @@ class MultiStepMultiMasksAndIous(nn.Module):
         images_lab_sim_nei7 = images_lab_sim_nei7.unsqueeze(1)
         ##추가##
 
+        # src_masks: [N, T, H, W] => 여기서 N은 이미 매칭된 object 수
+        N, T, H, W = src_masks.shape
+        K = images_lab_sim.shape[-3]  # K-1
+
+        # images_lab_sim: [N, T, K-1, H, W] → [N*T, K-1, H, W]
+        images_lab_sim = images_lab_sim.view(N, T, K, H, W).flatten(0, 1)  # [N*T, K-1, H, W]
+
+        # neighbor 유사도들은 [N*H, W, K] → unsqueeze(1) → [N*H, 1, W, K] → flatten(0, 1) → topk_mask
+        images_lab_sim_nei = self.topk_mask(images_lab_sim_nei.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei1 = self.topk_mask(images_lab_sim_nei1.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei2 = self.topk_mask(images_lab_sim_nei2.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei3 = self.topk_mask(images_lab_sim_nei3.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei4 = self.topk_mask(images_lab_sim_nei4.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei5 = self.topk_mask(images_lab_sim_nei5.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei6 = self.topk_mask(images_lab_sim_nei6.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei7 = self.topk_mask(images_lab_sim_nei7.unsqueeze(1).flatten(0, 1), 5)
+    
+        '''                       
         if len(src_idx[0].tolist()) > 0: ##k개 고르기
             images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
             #[N * T, K-1, H, W]
@@ -508,7 +524,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
             images_lab_sim_nei6 = self.topk_mask(torch.cat([images_lab_sim_nei6[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei7 = self.topk_mask(torch.cat([images_lab_sim_nei7[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             ##추가##
-                
+            ''' 
         k_size = 3 
 
         if src_masks.shape[0] > 0: ##매칭된 마스크가 있을 경욱#
