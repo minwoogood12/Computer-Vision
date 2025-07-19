@@ -16,6 +16,132 @@ from training.trainer import CORE_LOSS_KEY
 
 from training.utils.distributed import get_world_size, is_dist_avail_and_initialized
 
+def unfold_wo_center(x, kernel_size, dilation):
+    assert x.dim() == 4
+    assert kernel_size % 2 == 1
+
+    # using SAME padding
+    padding = (kernel_size + (dilation - 1) * (kernel_size - 1)) // 2
+    unfolded_x = F.unfold(
+        x, kernel_size=kernel_size,
+        padding=padding,
+        dilation=dilation
+    )
+
+    unfolded_x = unfolded_x.reshape(
+        x.size(0), x.size(1), -1, x.size(2), x.size(3)
+    )
+
+    # remove the center pixels
+    size = kernel_size ** 2
+    unfolded_x = torch.cat((
+        unfolded_x[:, :, :size // 2],
+        unfolded_x[:, :, size // 2 + 1:]
+    ), dim=2)
+
+    return unfolded_x
+
+def unfold_w_center(x, kernel_size, dilation):
+    assert x.dim() == 4
+    assert kernel_size % 2 == 1
+
+    # using SAME padding
+    padding = (kernel_size + (dilation - 1) * (kernel_size - 1)) // 2
+    unfolded_x = F.unfold(
+        x, kernel_size=kernel_size,
+        padding=padding,
+        dilation=dilation
+    )
+
+    unfolded_x = unfolded_x.reshape(
+        x.size(0), x.size(1), -1, x.size(2), x.size(3)
+    )
+
+    return unfolded_x
+
+def dice_coefficient(x, target):
+    eps = 1e-5
+    n_inst = x.size(0)
+    x = x.reshape(n_inst, -1)
+    target = target.reshape(n_inst, -1)
+    intersection = (x * target).sum(dim=1)
+    union = (x ** 2.0).sum(dim=1) + (target ** 2.0).sum(dim=1) + eps
+    loss = 1. - (2 * intersection / union)
+    return loss
+
+def compute_project_term(mask_scores, gt_bitmasks):
+    mask_losses_y = dice_coefficient(
+        mask_scores.max(dim=2, keepdim=True)[0],
+        gt_bitmasks.max(dim=2, keepdim=True)[0]
+    )
+    mask_losses_x = dice_coefficient(
+        mask_scores.max(dim=3, keepdim=True)[0],
+        gt_bitmasks.max(dim=3, keepdim=True)[0]
+    )
+    return (mask_losses_x + mask_losses_y).mean()
+
+def compute_pairwise_term(mask_logits, pairwise_size, pairwise_dilation):
+    assert mask_logits.dim() == 4
+
+    log_fg_prob = F.logsigmoid(mask_logits)
+    log_bg_prob = F.logsigmoid(-mask_logits)
+
+    log_fg_prob_unfold = unfold_wo_center(
+        log_fg_prob, kernel_size=pairwise_size,
+        dilation=pairwise_dilation
+    )
+    log_bg_prob_unfold = unfold_wo_center(
+        log_bg_prob, kernel_size=pairwise_size,
+        dilation=pairwise_dilation
+    )
+
+    # the probability of making the same prediction = p_i * p_j + (1 - p_i) * (1 - p_j)
+    # we compute the the probability in log space to avoid numerical instability
+    log_same_fg_prob = log_fg_prob[:, :, None] + log_fg_prob_unfold
+    log_same_bg_prob = log_bg_prob[:, :, None] + log_bg_prob_unfold
+
+    max_ = torch.max(log_same_fg_prob, log_same_bg_prob)
+    log_same_prob = torch.log(
+        torch.exp(log_same_fg_prob - max_) +
+        torch.exp(log_same_bg_prob - max_)
+    ) + max_
+
+    # loss = -log(prob)
+    return -log_same_prob[:, 0]
+    
+
+def compute_pairwise_term_neighbor(mask_logits, mask_logits_neighbor, pairwise_size, pairwise_dilation):
+    assert mask_logits.dim() == 4
+
+    log_fg_prob_neigh = F.logsigmoid(mask_logits_neighbor)
+    log_bg_prob_neigh = F.logsigmoid(-mask_logits_neighbor)
+
+    log_fg_prob = F.logsigmoid(mask_logits)
+    log_bg_prob = F.logsigmoid(-mask_logits)
+    
+    log_fg_prob_unfold = unfold_w_center(
+        log_fg_prob, kernel_size=pairwise_size,
+        dilation=pairwise_dilation
+    )
+    log_bg_prob_unfold = unfold_w_center(
+        log_bg_prob, kernel_size=pairwise_size,
+        dilation=pairwise_dilation
+    )
+
+    # the probability of making the same prediction = p_i * p_j + (1 - p_i) * (1 - p_j)
+    # we compute the the probability in log space to avoid numerical instability
+    log_same_fg_prob = log_fg_prob_neigh[:, :, None] + log_fg_prob_unfold
+    log_same_bg_prob = log_bg_prob_neigh[:, :, None] + log_bg_prob_unfold
+
+    max_ = torch.max(log_same_fg_prob, log_same_bg_prob)
+    log_same_prob = torch.log(
+        torch.exp(log_same_fg_prob - max_) +
+        torch.exp(log_same_bg_prob - max_)
+    ) + max_
+
+    return -log_same_prob[:, 0]
+
+
 
 def dice_loss(inputs, targets, num_objects, loss_on_multimask=False):
     """
@@ -337,12 +463,167 @@ class MultiStepMultiMasksAndIous(nn.Module):
                         images_lab_sim_nei6,
                         images_lab_sim_nei7
                        ):
-        loss_tk = 1
-        loss_proj = 2
-        loss_pairwise = 3
+        src_masks = outputs
+        target_masks = targets
 
+        images_lab_sim = torch.cat(images_lab_sim, dim =0)   
+        #shape: [(B*T)*(K-1), H, W]
+        images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0) 
+        # shape: [B*H, W, K]
+        images_lab_sim_nei1 = torch.cat(images_lab_sim_nei1, dim=0)
+        images_lab_sim_nei2 = torch.cat(images_lab_sim_nei2, dim=0)
+        images_lab_sim_nei3 = torch.cat(images_lab_sim_nei3, dim=0)
+        images_lab_sim_nei4 = torch.cat(images_lab_sim_nei4, dim=0)
+        ##추가##
+        images_lab_sim_nei5 = torch.cat(images_lab_sim_nei5, dim=0)
+        images_lab_sim_nei6 = torch.cat(images_lab_sim_nei6, dim=0)
+        images_lab_sim_nei7 = torch.cat(images_lab_sim_nei7, dim=0)
+        ##추가##
+
+        images_lab_sim = images_lab_sim.view(-1, target_masks.shape[1], images_lab_sim.shape[-3], images_lab_sim.shape[-2], images_lab_sim.shape[-1])
+        #[B, T, K-1, H, W]
+        images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1) 
+        #[B * H, 1, W, K]
+        images_lab_sim_nei1 = images_lab_sim_nei1.unsqueeze(1)
+        images_lab_sim_nei2 = images_lab_sim_nei2.unsqueeze(1)
+        images_lab_sim_nei3 = images_lab_sim_nei3.unsqueeze(1)
+        images_lab_sim_nei4 = images_lab_sim_nei4.unsqueeze(1)
+        ##추가##
+        images_lab_sim_nei5 = images_lab_sim_nei5.unsqueeze(1)
+        images_lab_sim_nei6 = images_lab_sim_nei6.unsqueeze(1)
+        images_lab_sim_nei7 = images_lab_sim_nei7.unsqueeze(1)
+        ##추가##
+
+        if len(src_idx[0].tolist()) > 0: ##k개 고르기
+            images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
+            #[N * T, K-1, H, W]
+            images_lab_sim_nei = self.topk_mask(torch.cat([images_lab_sim_nei[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            #[N, H*W, topk]
+            images_lab_sim_nei1 = self.topk_mask(torch.cat([images_lab_sim_nei1[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei2 = self.topk_mask(torch.cat([images_lab_sim_nei2[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei3 = self.topk_mask(torch.cat([images_lab_sim_nei3[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei4 = self.topk_mask(torch.cat([images_lab_sim_nei4[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            ##추가##
+            images_lab_sim_nei5 = self.topk_mask(torch.cat([images_lab_sim_nei5[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei6 = self.topk_mask(torch.cat([images_lab_sim_nei6[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            images_lab_sim_nei7 = self.topk_mask(torch.cat([images_lab_sim_nei7[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            ##추가##
+                
+        k_size = 3 
+
+        if src_masks.shape[0] > 0: ##매칭된 마스크가 있을 경욱#
+            pairwise_losses_neighbor = compute_pairwise_term_neighbor(
+                src_masks[:,:1], src_masks[:,1:2], k_size, 3
+            ) 
+            #[N]
+            pairwise_losses_neighbor1 = compute_pairwise_term_neighbor(
+                src_masks[:,1:2], src_masks[:,2:3], k_size, 3
+            ) 
+            #[N]
+            pairwise_losses_neighbor2 = compute_pairwise_term_neighbor(
+                src_masks[:,2:3], src_masks[:,3:4], k_size, 3
+            )
+            pairwise_losses_neighbor3 = compute_pairwise_term_neighbor(
+                src_masks[:,3:4], src_masks[:,4:5], k_size, 3
+            )
+            pairwise_losses_neighbor4 = compute_pairwise_term_neighbor(
+                src_masks[:,4:5], src_masks[:,5:6], k_size, 3
+            )
+            ##추가##
+            pairwise_losses_neighbor5 = compute_pairwise_term_neighbor(
+                src_masks[:,5:6], src_masks[:,6:7], k_size, 3
+            )
+            pairwise_losses_neighbor6 = compute_pairwise_term_neighbor(
+                src_masks[:,6:7], src_masks[:,7:8], k_size, 3
+            )
+            pairwise_losses_neighbor7 = compute_pairwise_term_neighbor(
+                src_masks[:,7:8], src_masks[:,0:1], k_size, 3
+            )
+            ##추가##
+            
+        # print('pairwise_losses_neighbor:', pairwise_losses_neighbor.shape)
+        src_masks = src_masks.flatten(0, 1)[:, None]
+        # [num_matched, T, H, W]=> [num_matched * T, 1, H, W]
+        target_masks = target_masks.flatten(0, 1)[:, None]
+        # [num_matched, T, H, W]=> [num_matched * T, 1, H, W]
+        target_masks = F.interpolate(target_masks, (src_masks.shape[-2], src_masks.shape[-1]), mode='bilinear')
+        # images_lab_sim = F.interpolate(images_lab_sim, (src_masks.shape[-2], src_masks.shape[-1]), mode='bilinear')
+        
+        
+        if src_masks.shape[0] > 0: #예측된 마스크있을떄 
+            loss_prj_term = compute_project_term(src_masks.sigmoid(), target_masks)  
+            #loss_proj계산
+
+            pairwise_losses = compute_pairwise_term(
+                src_masks, k_size, 2
+            ) 
+            #pairwise_losses 손실 측정
+
+            weights = (images_lab_sim >= 0.3).float() * target_masks.float()
+            #가중치
+            target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], 5, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
+            
+            target_masks_sum = (target_masks_sum >= 1.0).float() # ori is 1.0
+            weights_neighbor = (images_lab_sim_nei >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1 , dy 0.5
+            weights_neighbor1 = (images_lab_sim_nei1 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
+            weights_neighbor2 = (images_lab_sim_nei2 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
+            weights_neighbor3 = (images_lab_sim_nei3 >= 0.05).float() * target_masks_sum
+            weights_neighbor4 = (images_lab_sim_nei4 >= 0.05).float() * target_masks_sum
+            ##추가##
+            weights_neighbor5 = (images_lab_sim_nei5 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
+            weights_neighbor6 = (images_lab_sim_nei6 >= 0.05).float() * target_masks_sum
+            weights_neighbor7 = (images_lab_sim_nei7 >= 0.05).float() * target_masks_sum
+            ##추가##
+            
+            warmup_factor = min(self._iter.item() / float(self._warmup_iters), 1.0) #1.0
+
+            loss_pairwise = (pairwise_losses * weights).sum() / weights.sum().clamp(min=1.0)
+            loss_pairwise_neighbor = (pairwise_losses_neighbor * weights_neighbor).sum() / weights_neighbor.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor1 = (pairwise_losses_neighbor1 * weights_neighbor1).sum() / weights_neighbor1.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor2 = (pairwise_losses_neighbor2 * weights_neighbor2).sum() / weights_neighbor2.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor3 = (pairwise_losses_neighbor3 * weights_neighbor3).sum() / weights_neighbor3.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor4 = (pairwise_losses_neighbor4 * weights_neighbor4).sum() / weights_neighbor4.sum().clamp(min=1.0) * warmup_factor
+            ##추가##
+            loss_pairwise_neighbor5 = (pairwise_losses_neighbor5 * weights_neighbor5).sum() / weights_neighbor5.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor6 = (pairwise_losses_neighbor6 * weights_neighbor6).sum() / weights_neighbor6.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor7 = (pairwise_losses_neighbor7 * weights_neighbor7).sum() / weights_neighbor7.sum().clamp(min=1.0) * warmup_factor
+            #추가##
+        
+        else:
+            loss_prj_term = src_masks.sum() * 0.
+            loss_pairwise = src_masks.sum() * 0.
+            loss_pairwise_neighbor = src_masks.sum() * 0.
+            loss_pairwise_neighbor1 = src_masks.sum() * 0.
+            loss_pairwise_neighbor2 = src_masks.sum() * 0.
+            loss_pairwise_neighbor3 = src_masks.sum() * 0.
+            loss_pairwise_neighbor4 = src_masks.sum() * 0.
+            ##추가##
+            loss_pairwise_neighbor5 = src_masks.sum() * 0.
+            loss_pairwise_neighbor6 = src_masks.sum() * 0.
+            loss_pairwise_neighbor7 = src_masks.sum() * 0.
+            ##추가##
+
+        # print('loss_proj term:', loss_prj_term)
+        losses = {
+            "loss_mask": loss_prj_term,
+            "loss_bound": loss_pairwise,
+            ##추가##
+            "loss_bound_neighbor": (loss_pairwise_neighbor + loss_pairwise_neighbor1 + loss_pairwise_neighbor2 + loss_pairwise_neighbor3 + loss_pairwise_neighbor4 + loss_pairwise_neighbor5 +  loss_pairwise_neighbor6 +  loss_pairwise_neighbor7) * 0.1, # * 0.33
+            ##추가##
+        }                   
+        loss_tk = losses["loss_bound_neighbor"]
+        loss_proj = losses["loss_mask"]
+        loss_pairwise = losses["loss_bound"]
+                           
         return loss_tk, loss_proj, loss_pairwise
     ##추가##
+
+    def topk_mask(self, images_lab_sim, k):
+        images_lab_sim_mask = torch.zeros_like(images_lab_sim)
+        topk, indices = torch.topk(images_lab_sim, k, dim =1) # 1, 3, 5, 7
+        images_lab_sim_mask = images_lab_sim_mask.scatter(1, indices, topk)
+        return images_lab_sim_mask
+
     
     def _update_losses(
         self, losses, src_masks, target_masks, ious, num_objects, object_score_logits):
