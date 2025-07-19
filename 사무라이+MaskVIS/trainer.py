@@ -546,7 +546,7 @@ class Trainer:
         outputs = model(batch)
         targets = batch.masks
         batch_size = len(batch.img_batch)
-        ##기존 maskfreevis는 이미지가 List[Tensor(3,H,W) * B * T] 
+        ##기존 maskfreevis는 이미지가 List[Tensor(3,H,W) * B * T 배치사이즈] 
         ##SAM2는 image_batch : [T,B,C,H,W] 즉 이거를 이미지텐서 * B, T로 바꿔야함
         ##       targets : [T, O, H, W]
         ##추가##
