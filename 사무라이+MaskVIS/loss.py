@@ -115,7 +115,7 @@ def compute_pairwise_term_neighbor(mask_logits, mask_logits_neighbor, pairwise_s
 
     log_fg_prob_neigh = F.logsigmoid(mask_logits_neighbor)
     log_bg_prob_neigh = F.logsigmoid(-mask_logits_neighbor)
-
+ 
     log_fg_prob = F.logsigmoid(mask_logits)
     log_bg_prob = F.logsigmoid(-mask_logits)
     
