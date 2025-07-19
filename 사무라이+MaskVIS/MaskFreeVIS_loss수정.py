@@ -271,12 +271,12 @@ class VideoSetCriterion(nn.Module):
 
         src_idx = self._get_src_permutation_idx(indices) ####################
         src_masks = outputs["pred_masks"] #######################
-        src_masks = src_masks[src_idx]      #이거는 [num_matched , T, H ,W]
+        src_masks = src_masks[src_idx]     
         # Modified to handle video
         target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks) #이거는 [num_matched, T, H, W]
 
         # No need to upsample predictions as we are using normalized coordinates :)
-        # NT x 1 x H x W
+        
         src_masks = src_masks.flatten(0, 1)[:, None]
         target_masks = target_masks.flatten(0, 1)[:, None]
         
@@ -331,9 +331,16 @@ class VideoSetCriterion(nn.Module):
         src_masks = src_masks[src_idx] #이거는 [num_matched , T, H ,W] Num_match : t프레임 기간동아 매칭된 마스크 수 
         # Modified to handle video
         target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks) #이거는 [num_matched , T, H ,W]
-
-        images_lab_sim = torch.cat(images_lab_sim, dim =0)    # 영상수 10 프레임 16일때 [160 * (k-1, h,w)] => [160,k-1,h,w]
-        images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0) #[10 * (h*w , k)] => [10, h*w, k]
+ 
+        #src_,masks = [N, T, H, W]  
+        #target_masks = [N, T, H, W]
+        #images_lab_sim : List[Tensor(K-1, H,W)] * (B*T)
+        #images_lab_sim_nei : List[Tensor(H,W, K)] * (B)
+        
+        images_lab_sim = torch.cat(images_lab_sim, dim =0)   
+        #shape: [(B*T)*(K-1), H, W]
+        images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0) 
+        # shape: [B*H, W, K]
         images_lab_sim_nei1 = torch.cat(images_lab_sim_nei1, dim=0)
         images_lab_sim_nei2 = torch.cat(images_lab_sim_nei2, dim=0)
         images_lab_sim_nei3 = torch.cat(images_lab_sim_nei3, dim=0)
@@ -345,8 +352,9 @@ class VideoSetCriterion(nn.Module):
         ##추가##
 
         images_lab_sim = images_lab_sim.view(-1, target_masks.shape[1], images_lab_sim.shape[-3], images_lab_sim.shape[-2], images_lab_sim.shape[-1])
-        #[160,h,w, k-1] => [10, 16,k-1,h,w]
-        images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1)  #[10, h*w, k] = > [10, 1, h*w , k]
+        #[B, T, K-1, H, W]
+        images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1) 
+        #[B * H, 1, W, K]
         images_lab_sim_nei1 = images_lab_sim_nei1.unsqueeze(1)
         images_lab_sim_nei2 = images_lab_sim_nei2.unsqueeze(1)
         images_lab_sim_nei3 = images_lab_sim_nei3.unsqueeze(1)
@@ -359,9 +367,9 @@ class VideoSetCriterion(nn.Module):
 
         if len(src_idx[0].tolist()) > 0: ##k개 고르기
             images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
-            #[10, 16,k-1,h,w] => [num_matched * T, h,w,k-1]
+            #[N * T, K-1, H, W]
             images_lab_sim_nei = self.topk_mask(torch.cat([images_lab_sim_nei[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
-            #[10, 1, h*w , k]=> [num_matched, h*w, topk]
+            #[N, H*W, topk]
             images_lab_sim_nei1 = self.topk_mask(torch.cat([images_lab_sim_nei1[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei2 = self.topk_mask(torch.cat([images_lab_sim_nei2[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei3 = self.topk_mask(torch.cat([images_lab_sim_nei3[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
@@ -374,13 +382,15 @@ class VideoSetCriterion(nn.Module):
                 
         k_size = 3 
 
-        if src_masks.shape[0] > 0: ########pairwise loss구하기########
+        if src_masks.shape[0] > 0: ##매칭된 마스크가 있을 경욱#
             pairwise_losses_neighbor = compute_pairwise_term_neighbor(
                 src_masks[:,:1], src_masks[:,1:2], k_size, 3
             ) 
+            #[N]
             pairwise_losses_neighbor1 = compute_pairwise_term_neighbor(
                 src_masks[:,1:2], src_masks[:,2:3], k_size, 3
             ) 
+            #[N]
             pairwise_losses_neighbor2 = compute_pairwise_term_neighbor(
                 src_masks[:,2:3], src_masks[:,3:4], k_size, 3
             )
