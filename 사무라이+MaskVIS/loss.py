@@ -211,9 +211,15 @@ class MultiStepMultiMasksAndIous(nn.Module):
             for k, v in cur_losses.items():
                 losses[k] += v
 
+
+                   
         ##추가##
+        maskfree_mask = convert(outs_batch)
+        maskfree_target = targets_batch.permute(1,0,2,3)
+
+                   
         loss_tk, loss_proj, loss_pairwise = self.loss_masks_proj(
-            src_masks_list, targets_masks, num_objects,
+            maskfree_mask, maskfree_target, num_objects,
             images_lab_sim,
             images_lab_sim_nei,
             images_lab_sim_nei1,
@@ -292,7 +298,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
         losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
         return losses
     ##추가##
-    def convert_sam2_to_maskfreevis_format(outputs, step_idx=-1):
+    def convert(outputs, step_idx=-1):
         """
         outputs: List[Dict[str, List[Tensor[1, M, H, W]]]] of length T
         returns: Tensor[N, T, H, W]
