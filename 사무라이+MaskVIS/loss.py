@@ -292,6 +292,34 @@ class MultiStepMultiMasksAndIous(nn.Module):
         losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
         return losses
     ##추가##
+    def convert_sam2_to_maskfreevis_format(outputs, step_idx=-1):
+        """
+        outputs: List[Dict[str, List[Tensor[1, M, H, W]]]] of length T
+        returns: Tensor[N, T, H, W]
+        """
+        T = len(outputs)
+        B, M, H, W = outputs[0]["multistep_pred_multimasks_high_res"][step_idx].shape
+
+       
+
+        # 프레임마다 마지막 step의 마스크 예측만 사용
+        masks_per_frame = []
+        for t in range(T):
+            frame_tensor = outputs[t]["multistep_pred_multimasks_high_res"][step_idx]  # Tensor[1, M, H, W]
+            masks_per_frame.append(frame_tensor[0])  # remove batch dim → Tensor[M, H, W]
+
+        # 리스트 길이: T, 각 요소는 Tensor[M, H, W]
+        # 이제 각 object (M개)에 대해 T개 프레임에서의 마스크를 stack
+        masks_by_object = []
+        for obj_idx in range(M):  # object 0 ~ M-1
+            obj_masks = torch.stack([masks_per_frame[t][obj_idx] for t in range(T)], dim=0)  # [T, H, W]
+            masks_by_object.append(obj_masks)
+
+        # [N, T, H, W]
+        pred_masks_NTHW = torch.stack(masks_by_object, dim=0)
+        return pred_masks_NTHW
+
+    
     def loss_masks_proj(self, outputs, targets, num_objects, 
                         images_lab_sim, 
                         images_lab_sim_nei, 
