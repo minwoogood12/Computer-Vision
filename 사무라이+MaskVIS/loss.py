@@ -509,14 +509,14 @@ class MultiStepMultiMasksAndIous(nn.Module):
         images_lab_sim = images_lab_sim.view(N, T, K, H, W).flatten(0, 1)  # [N*T, K-1, H, W]
 
         # neighbor 유사도들은 [N*H, W, K] → unsqueeze(1) → [N*H, 1, W, K] → flatten(0, 1) → topk_mask
-        images_lab_sim_nei = self.topk_mask(images_lab_sim_nei.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei1 = self.topk_mask(images_lab_sim_nei1.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei2 = self.topk_mask(images_lab_sim_nei2.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei3 = self.topk_mask(images_lab_sim_nei3.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei4 = self.topk_mask(images_lab_sim_nei4.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei5 = self.topk_mask(images_lab_sim_nei5.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei6 = self.topk_mask(images_lab_sim_nei6.unsqueeze(1).flatten(0, 1), 5)
-        images_lab_sim_nei7 = self.topk_mask(images_lab_sim_nei7.unsqueeze(1).flatten(0, 1), 5)
+        images_lab_sim_nei = self.topk_mask(images_lab_sim_nei.flatten(0, 1), 5)
+        images_lab_sim_nei1 = self.topk_mask(images_lab_sim_nei1.flatten(0, 1), 5)
+        images_lab_sim_nei2 = self.topk_mask(images_lab_sim_nei2.flatten(0, 1), 5)
+        images_lab_sim_nei3 = self.topk_mask(images_lab_sim_nei3.flatten(0, 1), 5)
+        images_lab_sim_nei4 = self.topk_mask(images_lab_sim_nei4.flatten(0, 1), 5)
+        images_lab_sim_nei5 = self.topk_mask(images_lab_sim_nei5.flatten(0, 1), 5)
+        images_lab_sim_nei6 = self.topk_mask(images_lab_sim_nei6.flatten(0, 1), 5)
+        images_lab_sim_nei7 = self.topk_mask(images_lab_sim_nei7.flatten(0, 1), 5)
     
         '''                       
         if len(src_idx[0].tolist()) > 0: ##k개 고르기
@@ -586,7 +586,8 @@ class MultiStepMultiMasksAndIous(nn.Module):
 
             weights = (images_lab_sim >= 0.3).float() * target_masks.float()
             #가중치
-            target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], 5, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
+            T = src_masks.shape[1]
+            target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], T, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
             
             target_masks_sum = (target_masks_sum >= 1.0).float() # ori is 1.0
             weights_neighbor = (images_lab_sim_nei >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1 , dy 0.5
