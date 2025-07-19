@@ -561,7 +561,8 @@ class Trainer:
         rs_images = images_tensor #디버깅 수정
         
         #패딩처리해서 텐서로 묶음
-        downsampled_images = F.avg_pool2d(rs_images.tensor.float(), kernel_size=4, stride=4, padding=0) #for img in images]            #(3,H,W) -> (3,H//4, W//4)
+        #downsampled_images = F.avg_pool2d(rs_images.tensor.float(), kernel_size=4, stride=4, padding=0) #for img in images]  #디버깅          #(3,H,W) -> (3,H//4, W//4)
+        downsampled_images = F.avg_pool2d(rs_images.float(), kernel_size=4, stride=4, padding=0) #for img in images] #디버깅 수정
         images_lab = [torch.as_tensor(color.rgb2lab(ds_image[[2, 1, 0]].byte().permute(1, 2, 0).cpu().numpy()), device=ds_image.device, dtype=torch.float32).permute(2, 0, 1) for ds_image in downsampled_images]
         #색 순서 변환 RGB->LAB변환
         images_lab_sim = [get_images_color_similarity(img_lab.unsqueeze(0), k_size, 2) for img_lab in images_lab] # ori is 0.3, 0.5, 0.7
