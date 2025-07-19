@@ -550,12 +550,13 @@ class Trainer:
         ##SAM2는 image_batch : [T,B,C,H,W] 즉 이거를 이미지텐서 * B, T로 바꿔야함
         ##       targets : [T, O, H, W]
         ##추가##
-        T, B, C, H, W = batch.img_batch.shape ##디버깅
+        T, B, C, H, W = batch.img_batch.shape ##디버깅 수정
         images = list(batch.img_batch.permute(1, 0, 2, 3, 4).reshape(-1, C, H, W))
 
         k_size = 3 #3
         ##rs_images = ImageList.from_tensors(images, self.size_divisibility) 디버깅
-        rs_images = images
+        images_tensor = torch.stack(images) #디버깅 수정
+        rs_images = images_tensor #디버깅 수정
         
         #패딩처리해서 텐서로 묶음
         downsampled_images = F.avg_pool2d(rs_images.tensor.float(), kernel_size=4, stride=4, padding=0) #for img in images]            #(3,H,W) -> (3,H//4, W//4)
