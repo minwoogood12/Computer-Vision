@@ -17,6 +17,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+import torch.nn.functional as F #디버깅 수정
 import torch
 import torch.distributed as dist
 import torch.nn as nn
