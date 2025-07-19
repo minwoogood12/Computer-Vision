@@ -278,9 +278,15 @@ class MultiStepMultiMasksAndIous(nn.Module):
         self.weight_dict = weight_dict
         self.focal_alpha = focal_alpha
         self.focal_gamma = focal_gamma
+        ##추가##
+        self.register_buffer("_iter", torch.zeros([1]))
+        ##추가##
         assert "loss_mask" in self.weight_dict
         assert "loss_dice" in self.weight_dict
         assert "loss_iou" in self.weight_dict
+        ##추가##
+        self._warmup_iters = 2000
+        ##추가##
         if "loss_class" not in self.weight_dict:
             self.weight_dict["loss_class"] = 0.0
         ##추가##
@@ -340,7 +346,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
 
                    
         ##추가##
-        maskfree_mask = convert(outs_batch)
+        maskfree_mask = self.convert(outs_batch)
         maskfree_target = targets_batch.permute(1,0,2,3)
 
                    
@@ -461,6 +467,8 @@ class MultiStepMultiMasksAndIous(nn.Module):
                         images_lab_sim_nei6,
                         images_lab_sim_nei7
                        ):
+        self._iter += 1
+                           
         src_masks = outputs
         target_masks = targets
 
