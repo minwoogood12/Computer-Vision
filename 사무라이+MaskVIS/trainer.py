@@ -547,7 +547,8 @@ class Trainer:
         targets = batch.masks
         batch_size = len(batch.img_batch)
         ##기존 maskfreevis는 이미지가 [B*T,C,H,W] 
-        ##SAM2는 이미지가 [B,T=1,C,H,W]이므로 [B,C,H,W]로 변경
+        ##SAM2는 image_batch : [B,T,C,H,W]
+        ##       targets : [T, O, H, W]
         ##추가##
         images = batch.img_batch.squeeze(1)  # shape: [T, B, C, H, W] T : 프레임수
         
