@@ -228,7 +228,12 @@ class MultiStepMultiMasksAndIous(nn.Module):
         losses["loss_proj"] += loss_proj
         losses["loss_pairwise"] += loss_pairwise
         loss_sum = loss_tk + loss_proj + loss_pairwise
-        losses[CORE_LOSS_KEY] += loss_sum
+
+        losses[CORE_LOSS_KEY] += (
+            self.weight_dict["loss_tk"] * loss_tk +
+            self.weight_dict["loss_proj"] * loss_proj +
+            self.weight_dict["loss_pairwise"] * loss_pairwise
+        )
                    
         ##추가##
                    
