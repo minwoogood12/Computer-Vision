@@ -588,6 +588,7 @@ class Trainer:
                               ##추가##
                               images_lab_sim, 
                               images_lab_sim_nei,
+                              images_lab_sim_nei1,
                               images_lab_sim_nei2,
                               images_lab_sim_nei3,
                               images_lab_sim_nei4,
