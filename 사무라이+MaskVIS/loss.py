@@ -354,13 +354,12 @@ class MultiStepMultiMasksAndIous(nn.Module):
             maskfree_mask, maskfree_target, num_objects,
             images_lab_sim,
             images_lab_sim_nei,
-            images_lab_sim_nei1,
             images_lab_sim_nei2,
             images_lab_sim_nei3,
             images_lab_sim_nei4,
             images_lab_sim_nei5,
             images_lab_sim_nei6,
-            images_lab_sim_nei7
+            images_lab_sim_nei7,
         )
         losses["loss_tk"] += loss_tk
         losses["loss_proj"] += loss_proj
