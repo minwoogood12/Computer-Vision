@@ -274,12 +274,13 @@ class VideoMaskFormer(nn.Module):
             for frame in video["image"]:
                 images.append(frame.to(self.device))
         #maskfreevis images : List[Tensor(3,H,W) * (B * T)]
-        
+        #sam2 : [B, T, C, H, W]
+
         if self.training:
             k_size = 3 #3
             rs_images = ImageList.from_tensors(images, self.size_divisibility)
             #가장 큰 사이즈로 모두 같은 양의 패딩적용 - 해상도 이미지중 가장 큰 h, w로 모두 맞춰줌 (디택트론이라 다른 방법 찾아야함)  
-            #Tensor[B*T, 3, H_pad, W_pad[
+            #Tensor[B*T, 3, H_pad, W_pad]
             downsampled_images = F.avg_pool2d(rs_images.tensor.float(), kernel_size=4, stride=4, padding=0) #for img in images]
             #이미지를 h/4, w/4적용 (유사도 비교니까)
             #Tensor[B*T, 3, H_pad/4, W_pad.4]
