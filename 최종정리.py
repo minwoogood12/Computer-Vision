@@ -10,14 +10,12 @@
 2. run_train() : 
 while self.epoch < self.max_epochs:현재 epoch기준 Max_epoch만큼 반복
   dataloader = Iterable(커스텀된 리스트 느낌) = [
-    {'video_images': Tensor [B, T, 3, H, W],       # 영상 프레임 시퀀스
-    'gt_masks': Tensor [B, T, N, H, W],           # ground truth segmentation masks
-    'gt_boxes': Tensor [B, T, N, 4],              # GT boxes (optional, not always used)
-    'prompt_points': Tensor [B, T, N, num_pts, 2],# point prompt 위치 num_pts : 객체의 여러 포인트 , 2 : 좌표 2곳
-    'prompt_labels': Tensor [B, T, N, num_pts],   # 각 point의 foreground(1)/background(0) 레이블
-    'frame_ids': Tensor [B, T],                   # 프레임 인덱스
-    'meta': {...},                                # 시퀀스 이름 등 메타 정보
-    ...}
+    {img_batch: torch.FloatTensor #[T,B,C,H,W]
+    obj_to_frame_idx: torch.IntTensor [T, O, 2]
+    masks: torch.BoolTensor [T, O, H, W]
+    metadata: BatchedVideoMetaData
+
+    dict_key: str}
    ... 
   ] #length : Batch 개수
   outs = self.train_epoch(dataloader) -> 최종 log결과 딕셔너리
@@ -32,6 +30,23 @@ for data_iter, batch in enumerate(train_loader) : 전체 배치 수만큼 반복
 [최종 로그값 딕셔너리 리턴] 
 => 매 배치마다 gradient파라미터 업데이트 (_run_step에서 매 배치마다 backward()) => 즉 배치한번마다 backward, update(step) 실행
 
-4. _run_step
-loss_dict, batch_size, extra_losses = self._step(batch, self.model, phase,) 이떄 loss_dict : 1개의 값(주요 1개 로스) , extra losses(나머지 로스들)
-self.scaler.scale(loss).backwardㅇㅇ
+4. def _run_step(
+        self,
+        batch: BatchedVideoDatapoint,
+        phase: str,
+        loss_mts: Dict[str, AverageMeter],
+        extra_loss_mts: Dict[str, AverageMeter],
+        raise_on_error: bool = True,
+    ):
+loss_dict, batch_size, extra_losses = self._step(batch, self.model, phase,) 이떄 loss_dict : 1개의 값(모든로스의 합) , extra losses(각각 개별 로스)
+self.scaler.scale(loss).backward
+=>loss_dict만 backward(), extra_losses는 logging용도
+
+5. _step
+outputs = model(batch)
+targets = batch.masks #[T,O,H,W] SAM2는 O가 3으로 최대 3개 예측 가능 / SAMURAI는 O가 1로 무조건 단일 예측 모델임
+key = batch.dict_key 
+loss = self.loss[key](outputs, targets) 로스계산 #outputs = 미정!! targets : [T,O,H,W]
+#loss : {"core_loss" : 0.7, "loss_mask" : 0.2 .....}
+return core_loss(0.7),  batch_size, (core_loss제외 나머지 로스들)
+
