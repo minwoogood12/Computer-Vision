@@ -52,8 +52,21 @@ return core_loss(0.7),  batch_size, (core_loss제외 나머지 로스들)
 
 <training/model/sam2.py>
 1. forward(self, input : BatchedVideoDataPoint):
-backbone_out = self.forward_image(input.flat_img_batch) #backbone으로 feature 추출
+backbone_out = self.forward_image(input.flat_img_batch) #backbone으로 feature 추출 flat_img_batch : [B*T,C,H,W]
 backbone_out = self.prepare_prompt_inputs(backbone_out, input) #??
 previous_stages_out = self.forward_tracking(backbone_out, iput) #프레임 각각 예측 및 메모리 업데이트   
 return previous_stages_out
+
+<sam2/modeling/sam2_base.py>
+1.forward_image(self, img_batch: torch.Tensor):
+backbone_out = self.image_encoder(img_batch) #backbone처리 image_batch : [B*T, C, H, W]
+if self.use_high_res_features_in_sam이 참이면 4개의 레이어중 앞의 2개의 레이어륾 미리 conv연산 처리
+return backbone_out #backbone을 거친 feature 리턴ㄱ
+
+<sam2/modeling/backbones/image_encoder.py>
+1.forward(self, sample: torch.Tensor):
+features, pos = self.neck(self.trunk(sample)) #trunk(vit_encoder-hiera), neck(FPN)
+.... 이후 관련 정보 리턴. 여기는 아직 공부 안함
+
+
 
