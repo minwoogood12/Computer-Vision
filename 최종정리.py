@@ -68,5 +68,64 @@ return backbone_out #backbone을 거친 feature 리턴ㄱ
 features, pos = self.neck(self.trunk(sample)) #trunk(vit_encoder-hiera), neck(FPN)
 .... 이후 관련 정보 리턴. 여기는 아직 공부 안함
 
+------------일단은 이미지 백본 ------ 마스크 예측까지 생략하고 loss부터해야할듯 싶어요
+
+
+<training/loss_fpn.py>
+- outs_batch[0] keys: ['point_inputs', 'mask_inputs', 'multistep_pred_masks', 'multistep_pred_masks_high_res', 'multistep_pred_multimasks', 'multistep_pred_multimasks_high_res', 'multistep_pred_ious', 'multistep_point_inputs', 'multistep_object_score_logits', 'pred_masks', 'pred_masks_high_res', 'maskmem_features', 'maskmem_pos_enc']
+      - point_inputs: type = <class 'NoneType'>
+      - mask_inputs: shape = (1, 1, 512, 512), dtype = torch.bool
+      - multistep_pred_masks: shape = (1, 1, 128, 128), dtype = torch.float32
+      - multistep_pred_masks_high_res: shape = (1, 1, 512, 512), dtype = torch.float32
+      - multistep_pred_multimasks: type = <class 'list'>
+      - multistep_pred_multimasks_high_res: type = <class 'list'>
+      - multistep_pred_ious: type = <class 'list'>
+      - multistep_point_inputs: type = <class 'list'>
+      - multistep_object_score_logits: type = <class 'list'>
+      - pred_masks: shape = (1, 1, 128, 128), dtype = torch.float32
+      - pred_masks_high_res: shape = (1, 1, 512, 512), dtype = torch.float32
+      - maskmem_features: shape = (1, 64, 32, 32), dtype = torch.bfloat16
+      - maskmem_pos_enc: type = <class 'list'>
+
+outs_batch = [{
+ multistep_pred_multimasks_high_res :  List[(N,M,H,W)*step]
+ multistep_pred_ious : List[B, O] #예측 객체마다 IOU
+ multistep_object_score_logits : List[B,1] #이프레임에 객체가 존재할 확률
+} , ..... ] #len : 프레임수 
+targets_batch : [T, N, H, W]
+num_objects = O
+1.forward(self, outs_batch: List[Dict], targets_batch: torch.Tensor):
+num_objects = targets_batch의 두번째 차원 (객체 수)
+for outs, targets in zip(outs_batch, targets_batch): #8프레임 반복
+            cur_losses = self._forward(outs, targets, num_objects)
+            for k, v in cur_losses.items(): #매 프레임 마다 로스값 더하기
+                losses[k] += v
+return losses 
+outputs : {
+ multistep_pred_multimasks_high_res :  List[(N,M,H,W)*step] #스탭 개수는 1에서 8로 랜덤 N : 프레임의 객체 개수 M : 각 객체마다 예측된 마스크 수 
+ multistep_pred_ious : List[B, O] #예측 객체마다 IOU
+ multistep_object_score_logits : List[B,1] #이프레임에 객체가 존재할 확률
+}
+targets : [N,H,W]
+2. _forward(self, outputs: Dict, targets: torch.Tensor, num_objects):
+target_masks = targets.unsqueeze(1).float() # [N, 1, H, W]
+src_masks_list = outputs["multistep_pred_multimasks_high_res"] #List[(N, M, H, W)] length : Step수
+ious_list = outputs["multistep_pred_ious"]
+object_score_logits_list = outputs["multistep_object_score_logits"]
+losses = {"loss_mask": 0, "loss_dice": 0, "loss_iou": 0, "loss_class": 0}
+for src_masks, ious, object_score_logits in zip( #Step수만큼 반복 
+            src_masks_list, ious_list, object_score_logits_list
+        ):
+          self._update_losses(
+                losses, src_masks, target_masks, ious, num_objects, object_score_logits
+            )
+        losses[CORE_LOSS_KEY] = self.reduce_loss(losses)
+return losses
+
+정리 : 
+예측 마스크 - List[(N,M,H,W)) * Step_num] * Frame_num
+GT 마스크- [T, N, H, W]
+사무라이에서는 1개만 추적하기때문에 N : 1
+
 
 
