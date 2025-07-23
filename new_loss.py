@@ -137,7 +137,9 @@ def get_images_color_similarity(images, kernel_size, dilation):
     unfolded_images = unfold_wo_center(
         images, kernel_size=kernel_size, dilation=dilation
     )
-
+    #입력 [B x C x H x W] 4차원 텐서 
+    #출력은 [B, C, k^2, H , W] 5차원 텐서
+    #즉 중심 제외 주변의 정보를 담아서 리턴
     diff = images[:, :, None] - unfolded_images
     similarity = torch.exp(-torch.norm(diff, dim=1) * 0.5)
     
@@ -152,7 +154,9 @@ def get_neighbor_images_color_similarity(images, images_neighbor, kernel_size, d
     )
 
     diff = images_neighbor[:, :, None] - unfolded_images
+    #1,c, K^2, h, w
     similarity = torch.exp(-torch.norm(diff, dim=1) * 0.5)
+    #1,k^2, H, W
 
     return similarity
 
@@ -166,8 +170,10 @@ def get_neighbor_images_patch_color_similarity(images, images_neighbor, kernel_s
     unfolded_images_neighbor = unfold_w_center(
         images_neighbor, kernel_size=kernel_size, dilation= 1 #dilation
     )
+    #[B,C,K^2,H,W]
     
-    unfolded_images = unfolded_images.flatten(1,2)
+    unfolded_images = unfolded_images.flatten(1,2) 
+    #[B,C*K^2, H,W]
     unfolded_images_neighbor = unfolded_images_neighbor.flatten(1,2)
     
     similarity = get_neighbor_images_color_similarity(unfolded_images, unfolded_images_neighbor, 3, 3)
@@ -586,11 +592,14 @@ class Trainer:
         rs_images = pad_image_list(image_list, size_divisibility=32)
         downsampled_images = F.avg_pool2d(rs_images.float(), kernel_size=4, stride=4, padding=0)
         images_lab = [torch.as_tensor(color.rgb2lab(ds_image[[2, 1, 0]].byte().permute(1, 2, 0).cpu().numpy()), device=ds_image.device, dtype=torch.float32).permute(2, 0, 1) for ds_image in downsampled_images]
-
+        #images_lab = List[Tensor(H_pad, W_ad, 3) * (B*T)]
+        
         images_lab_sim = [get_images_color_similarity(img_lab.unsqueeze(0), k_size, 2) for img_lab in images_lab] # ori is 0.3, 0.5, 0.7
-
+        #List[Tensor(1,K^2, H, W) * (B*T)]
         images_lab_sim_nei = [get_neighbor_images_patch_color_similarity(images_lab[ii].unsqueeze(0), images_lab[ii+1].unsqueeze(0), 3, 3) for ii in range(0, len(images_lab), 8)] # ori dilation is 3
+        #List[Tensor(1,K^2, H, W) * B]0번째 프레임, 8번째 프레임, 16번쨰 프레임
         images_lab_sim_nei1 = [get_neighbor_images_patch_color_similarity(images_lab[ii+1].unsqueeze(0), images_lab[ii+2].unsqueeze(0), 3, 3) for ii in range(0, len(images_lab), 8)]
+        #List[Tensor(1,K^2, H, W) * B]1번째 프레임, 9번째 프레임, 17번쨰 프레임
         images_lab_sim_nei2 = [get_neighbor_images_patch_color_similarity(images_lab[ii+2].unsqueeze(0), images_lab[ii+3].unsqueeze(0), 3, 3) for ii in range(0, len(images_lab), 8)]
         images_lab_sim_nei3 = [get_neighbor_images_patch_color_similarity(images_lab[ii+3].unsqueeze(0), images_lab[ii+4].unsqueeze(0), 3, 3) for ii in range(0, len(images_lab), 8)]
         images_lab_sim_nei4 = [get_neighbor_images_patch_color_similarity(images_lab[ii+4].unsqueeze(0), images_lab[ii+5].unsqueeze(0), 3, 3) for ii in range(0, len(images_lab), 8)]
