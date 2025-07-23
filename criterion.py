@@ -456,10 +456,10 @@ class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
         src_masks = outputs["pred_masks"] 
         #[B,Q,H,W]
         src_masks = src_masks[src_idx]
-        #[N,H,W]
+        #[N,T,H,W]
         # Modified to handle video
         target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks)
-        #[N,H,W]
+        #[N,T,H,W]
         images_lab_sim = torch.cat(images_lab_sim, dim =0)
         #List[Tensor(1, K^2,H,W) * (B*T)]를 1차원에 길이만큼 이어붙임 => Tensor(B*T,K^2,H,W)
         images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0)
@@ -497,6 +497,8 @@ class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
             pairwise_losses_neighbor = compute_pairwise_term_neighbor(
                 src_masks[:,:1], src_masks[:,1:2], k_size, 3
             ) 
+             #예측마스크[N, T, H, W] 의 객체 별로 각가 0번프레임[N,1,H,W], 1번프레임[N,1,H,W] 비교
+            #[N, H, W] 예측된 마스크 n개에 대해 0번 1번 프레임이 얼마나 비슷한 예측인지 비교한 map (0~0.69) 0이면 일치, 0.69면 일치안함
             pairwise_losses_neighbor1 = compute_pairwise_term_neighbor(
                 src_masks[:,1:2], src_masks[:,2:3], k_size, 3
             ) 
