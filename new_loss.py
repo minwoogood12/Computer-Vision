@@ -100,7 +100,16 @@ def loss_masks_proj(self, outputs, targets, num_masks,
                 src_masks[:,3:4], src_masks[:,4:5], k_size, 3
             )
             pairwise_losses_neighbor4 = compute_pairwise_term_neighbor(
-                src_masks[:,4:5], src_masks[:,0:1], k_size, 3
+                src_masks[:,4:5], src_masks[:,5:6], k_size, 3
+            )
+            pairwise_losses_neighbor5 = compute_pairwise_term_neighbor(
+                src_masks[:,5:6], src_masks[:,6:7], k_size, 3
+            )
+            pairwise_losses_neighbor6 = compute_pairwise_term_neighbor(
+                src_masks[:,6:7], src_masks[:,7:8], k_size, 3
+            )
+            pairwise_losses_neighbor7 = compute_pairwise_term_neighbor(
+                src_masks[:,7:8], src_masks[:,0:1], k_size, 3
             )
             
         # print('pairwise_losses_neighbor:', pairwise_losses_neighbor.shape)
@@ -128,9 +137,9 @@ def loss_masks_proj(self, outputs, targets, num_masks,
             #target_masks : [N*T,1,H,W]
             #결과 [N*T, K², H, W]
 
-            target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], 5, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
+            target_masks_sum = target_masks.reshape(pairwise_losses_neighbor.shape[0], 8, target_masks.shape[-2], target_masks.shape[-1]).sum(dim=1, keepdim=True)
             #target_masks 를 다시 [N*T,1,H,W] -> [N,T,H,W]로 바꿈 -> T축으로 합
-            # => [N,1,H,W]
+            # => [N,1,H,W] #8 : 8개의 프레임의미
 
             target_masks_sum = (target_masks_sum >= 1.0).float() # ori is 1.0
             #[N,1,H,W]에서 한번이라도 프레임에 등장했나 등장하면 1아니면 0
@@ -144,6 +153,9 @@ def loss_masks_proj(self, outputs, targets, num_masks,
             weights_neighbor2 = (images_lab_sim_nei2 >= 0.05).float() * target_masks_sum # ori is 0.5, 0.01, 0.001, 0.005, 0.0001, 0.02, 0.05, 0.075, 0.1, dy 0.5
             weights_neighbor3 = (images_lab_sim_nei3 >= 0.05).float() * target_masks_sum
             weights_neighbor4 = (images_lab_sim_nei4 >= 0.05).float() * target_masks_sum
+            weights_neighbor5 = (images_lab_sim_nei5 >= 0.05).float() * target_masks_sum
+            weights_neighbor6 = (images_lab_sim_nei6 >= 0.05).float() * target_masks_sum
+            weights_neighbor7 = (images_lab_sim_nei7 >= 0.05).float() * target_masks_sum
 
             warmup_factor = min(self._iter.item() / float(self._warmup_iters), 1.0) #1.0
             #학습 수 설정 나중 갈수록 더 가중치있게
@@ -153,11 +165,14 @@ def loss_masks_proj(self, outputs, targets, num_masks,
             loss_pairwise_neighbor = (pairwise_losses_neighbor * weights_neighbor).sum() / weights_neighbor.sum().clamp(min=1.0) * warmup_factor
             #(예측마스크 0번과 1번마스크 비교 * 0번과 1번마스크사이의 sim_nei 비교 가중치값)의 합
             loss_pairwise_neighbor1 = (pairwise_losses_neighbor1 * weights_neighbor1).sum() / weights_neighbor1.sum().clamp(min=1.0) * warmup_factor
-            
             loss_pairwise_neighbor2 = (pairwise_losses_neighbor2 * weights_neighbor2).sum() / weights_neighbor2.sum().clamp(min=1.0) * warmup_factor
             loss_pairwise_neighbor3 = (pairwise_losses_neighbor3 * weights_neighbor3).sum() / weights_neighbor3.sum().clamp(min=1.0) * warmup_factor
             loss_pairwise_neighbor4 = (pairwise_losses_neighbor4 * weights_neighbor4).sum() / weights_neighbor4.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor5 = (pairwise_losses_neighbor5 * weights_neighbor5).sum() / weights_neighbor5.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor6 = (pairwise_losses_neighbor6 * weights_neighbor6).sum() / weights_neighbor6.sum().clamp(min=1.0) * warmup_factor
+            loss_pairwise_neighbor7 = (pairwise_losses_neighbor7 * weights_neighbor7).sum() / weights_neighbor7.sum().clamp(min=1.0) * warmup_factor
 
+                           
         else:
             loss_prj_term = src_masks.sum() * 0.
             loss_pairwise = src_masks.sum() * 0.
@@ -166,12 +181,24 @@ def loss_masks_proj(self, outputs, targets, num_masks,
             loss_pairwise_neighbor2 = src_masks.sum() * 0.
             loss_pairwise_neighbor3 = src_masks.sum() * 0.
             loss_pairwise_neighbor4 = src_masks.sum() * 0.
+            loss_pairwise_neighbor5 = src_masks.sum() * 0.
+            loss_pairwise_neighbor6 = src_masks.sum() * 0.
+            loss_pairwise_neighbor7 = src_masks.sum() * 0.
+                
 
         # print('loss_proj term:', loss_prj_term)
         losses = {
             "loss_mask": loss_prj_term,
             "loss_bound": loss_pairwise,
-            "loss_bound_neighbor": (loss_pairwise_neighbor + loss_pairwise_neighbor1 + loss_pairwise_neighbor2 + loss_pairwise_neighbor3 + loss_pairwise_neighbor4) * 0.1, # * 0.33
+            "loss_bound_neighbor": (loss_pairwise_neighbor
+                                    + loss_pairwise_neighbor1 
+                                    + loss_pairwise_neighbor2 
+                                    + loss_pairwise_neighbor3
+                                    + loss_pairwise_neighbor4
+                                    + loss_pairwise_neighbor5
+                                    + loss_pairwise_neighbor6
+                                    + loss_pairwise_neighbor7
+                                   ) * 0.1, # * 0.33
         }
 
         del src_masks
