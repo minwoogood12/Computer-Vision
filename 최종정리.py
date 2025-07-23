@@ -128,5 +128,7 @@ return losses
 GT 마스크- [T, N, H, W]
 사무라이에서는 1개만 추적하기때문에 N : 1
 
-
-
+maskfreevis 
+원본이미지 - List[Tensor(C,H,W) *(B*T)]
+예측 마스크 - [B, Q, H, W] -> [N,H,W] 매칭 후
+GT 마스크-  [N, T,  H, W] - >[N,H,W]
