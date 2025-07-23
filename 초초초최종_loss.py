@@ -309,10 +309,10 @@ class MultiStepMultiMasksAndIous(nn.Module):
             torch.distributed.all_reduce(num_objects)
         num_objects = torch.clamp(num_objects / get_world_size(), min=1).item()
 
-        mfvis_masks = convert_predict(outs_batch)
-        mfvis_gt = convert_gt(targets_batch)
+        mfvis_masks = self.convert_predict(outs_batch)
+        mfvis_gt = self.convert_gt(targets_batch)
 
-        loss_tk, loss_pairwise, loss_proj = loss_mask_proj(mfvis_masks, mfvis_gt,
+        loss_tk, loss_pairwise, loss_proj = self.loss_mask_proj(mfvis_masks, mfvis_gt,
                                                        images_lab_sim, 
                                                        images_lab_sim_nei, 
                                                        images_lab_sim_nei1,
