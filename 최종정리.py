@@ -123,6 +123,7 @@ for src_masks, ious, object_score_logits in zip( #Step수만큼 반복
 return losses
 
 정리 : 
+원본 이미지 - [T,B,C,H,W] 하나의 배치 
 예측 마스크 - List[(N,M,H,W)) * Step_num] * Frame_num
 GT 마스크- [T, N, H, W]
 사무라이에서는 1개만 추적하기때문에 N : 1
