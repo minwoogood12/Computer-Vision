@@ -437,31 +437,55 @@ class VideoSetCriterion(nn.Module): #손실 계산 모듈 DETR 변형
         """
         assert "pred_masks" in outputs
         
+        assert "pred_masks" in outputs
+        
         self._iter += 1
 
+        '''
+        indices = [
+          (tensor([0, 1]), tensor([2, 0])),
+          (tensor([3]), tensor([1]))
+        ] 총 배치 개수만큼 리스트로
+
+        '''
+        '''
+        batch_idx = tensor([0, 0, 1])  배치 번호
+        src_idx   = tensor([0, 2, 1]) 쿼리 번호
+        '''
         src_idx = self._get_src_permutation_idx(indices)
-        src_masks = outputs["pred_masks"]
+        src_masks = outputs["pred_masks"] 
+        #[B,Q,H,W]
         src_masks = src_masks[src_idx]
+        #[N,H,W]
         # Modified to handle video
         target_masks = torch.cat([t['masks'][i] for t, (_, i) in zip(targets, indices)]).to(src_masks)
-
+        #[N,H,W]
         images_lab_sim = torch.cat(images_lab_sim, dim =0)
+        #List[Tensor(1, K^2,H,W) * (B*T)]를 1차원에 길이만큼 이어붙임 => Tensor(B*T,K^2,H,W)
         images_lab_sim_nei = torch.cat(images_lab_sim_nei, dim=0)
+        #Tensor(B,K^2,H,W)
         images_lab_sim_nei1 = torch.cat(images_lab_sim_nei1, dim=0)
         images_lab_sim_nei2 = torch.cat(images_lab_sim_nei2, dim=0)
         images_lab_sim_nei3 = torch.cat(images_lab_sim_nei3, dim=0)
         images_lab_sim_nei4 = torch.cat(images_lab_sim_nei4, dim=0)
 
         images_lab_sim = images_lab_sim.view(-1, target_masks.shape[1], images_lab_sim.shape[-3], images_lab_sim.shape[-2], images_lab_sim.shape[-1])
+        #Tensor(B,T,K^2,H,W)
         images_lab_sim_nei = images_lab_sim_nei.unsqueeze(1)
+        #Tensor(B,1,K^2,H,W)
         images_lab_sim_nei1 = images_lab_sim_nei1.unsqueeze(1)
         images_lab_sim_nei2 = images_lab_sim_nei2.unsqueeze(1)
         images_lab_sim_nei3 = images_lab_sim_nei3.unsqueeze(1)
         images_lab_sim_nei4 = images_lab_sim_nei4.unsqueeze(1)
 
         if len(src_idx[0].tolist()) > 0:
-            images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
             images_lab_sim_nei = self.topk_mask(torch.cat([images_lab_sim_nei[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
+            #topk : 총 배치개수만큼 첫번째 프레임의 유사도가 만들어짐 
+            #배치개수 : 8이면 8개 리스트만큼의 0번쨰 1번쨰 프레임의 유사도 
+            #이중에 batch_idx 즉 매칭된 배치를 다 이어서 
+            #[N,k^2, H, W]로 만들고 
+            #각각 배치에서 각 8개의 방향 K^2중에 5개만 골라서 나머지는 0으로만들고 다시 리턴
+            #여기서 배치개수만큼이기때문에 만약 매칭은 2~3프레임일수도있는데 그냥 0~1번도 사용 중복됨 즉 5* 예측 마스크수만큼
             images_lab_sim_nei1 = self.topk_mask(torch.cat([images_lab_sim_nei1[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei2 = self.topk_mask(torch.cat([images_lab_sim_nei2[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
             images_lab_sim_nei3 = self.topk_mask(torch.cat([images_lab_sim_nei3[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1), 5)
