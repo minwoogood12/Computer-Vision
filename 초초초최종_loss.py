@@ -459,7 +459,7 @@ class MultiStepMultiMasksAndIous(nn.Module):
         images_lab_sim_nei6 = images_lab_sim_nei6.unsqueeze(1)
         images_lab_sim_nei7 = images_lab_sim_nei7.unsqueeze(1)
 
-        images_lab_sim = torch.cat([images_lab_sim[ind][None] for ind in src_idx[0].tolist()]).flatten(0, 1)
+        images_lab_sim = images_lab_sim.flatten(0, 1)
         #[N*T,K^2,H,W]
         images_lab_sim_nei = self.topk_mask(images_lab_sim_nei.flatten(0, 1), 5)
         #Tensor(B,1,K^2,H,W) 배치 개수 중에 쌍이 된 배치수만큼 cat하고 각각 배치에 대해서 k^2중에 5개만 고르고 나머지 0으로 만들고 리턴
