@@ -1,4 +1,4 @@
-- _target_: training.dataset.transforms.ColorJitter
+          - _target_: training.dataset.transforms.ColorJitter
           consistent_transform: False
           brightness: 0.5
           contrast: 0.5
