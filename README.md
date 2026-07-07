@@ -16,15 +16,14 @@
 
 ## Installation
 
-Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10 and
-CUDA 12.x.
+Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10,
+PyTorch 2.3.1, and CUDA 12.1.
 
 ```bash
 conda create -n rpm python=3.10 -y
 conda activate rpm
 
-# Install PyTorch matching your CUDA version (see https://pytorch.org).
-# Example for CUDA 12.1:
+# Install PyTorch built for CUDA 12.1 (see https://pytorch.org for other versions).
 pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
 ```
 
