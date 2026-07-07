@@ -9,10 +9,6 @@
 </p>
 
 <p align="center">
-  Official implementation of <b>RPM</b> (ICML 2026).
-</p>
-
-<p align="center">
   <img src="assets/main_figure.png" width="90%">
 </p>
 
@@ -34,14 +30,13 @@ rpm_github/
 │   ├── training/             # training loop, FPM losses, datasets
 │   └── checkpoints/          # model weights (git-ignored)
 ├── scripts/                  # inference entry points (LaSOT / LaSOT-ext)
-├── tools/                    # evaluation (success AUC)
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Environment Setup
+## Installation
 
 Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10 and
 CUDA 12.x.
@@ -173,13 +168,9 @@ Each script writes one `<video>.txt` per sequence (`x,y,w,h` per frame).
 
 ---
 
-## Acknowledgements
-
-Built on [SAM 2](https://github.com/facebookresearch/sam2). The long-term memory
-management follows [HiM2SAM](https://github.com/dyhBUPT/HiM2SAM); the
-predictive-memory dynamics use [Mamba](https://github.com/state-spaces/mamba).
-
 ## Citation
+
+If you find this work useful, please consider citing our paper:
 
 ```bibtex
 @inproceedings{kim2026rpm,
@@ -189,3 +180,19 @@ predictive-memory dynamics use [Mamba](https://github.com/state-spaces/mamba).
   year      = {2026}
 }
 ```
+
+---
+
+## Acknowledgements
+
+This codebase is built on [SAM 2](https://github.com/facebookresearch/sam2). The
+long-term memory management strategy follows
+[HiM2SAM](https://github.com/LouisFinner/HiM2SAM); the predictive-memory dynamics
+are implemented with [Mamba](https://github.com/state-spaces/mamba).
+
+---
+
+## License
+
+This project is released under the [Apache 2.0 License](LICENSE), consistent
+with the SAM 2 codebase it builds upon.
