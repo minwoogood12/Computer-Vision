@@ -1,19 +1,10 @@
-# RPM: Reliability-Guided Predictive Memory
+# Memory as Dynamics: Learning Reliability-Guided Predictive Models for Online Video Perception
 
-Official implementation of **"Memory as Dynamics: Learning Reliability-Guided
-Predictive Models for Online Video Perception"** (ICML 2026).
+**Minwoo Kim, [Sang Min Yoon](https://scholar.google.com/citations?user=V6HVW-QAAAAJ&hl=ko&oi=ao)**
 
-RPM augments a SAM2-based video model with a **predictive-memory** branch that
-rolls the recent memory tracklet forward using state-space (Mamba) dynamics, and
-injects the prediction into the mask decoder as a dense prompt **only when it is
-reliable**. A reliability signal — combining observation confidence and
-prediction–observation consistency — gates when the predictive prompt is
-activated, preventing unreliable predictions from contaminating long-term memory
-under occlusion.
+HCI Lab, College of Computer Science, Kookmin University, Seoul, Korea
 
-This repository unifies **training** (learning the predictive prompt) and
-**inference** (reliability-guided tracking) in a single codebase, evaluated on
-visual object tracking (LaSOT, LaSOT-ext) with the Hiera-B+ backbone.
+Official implementation of **RPM** (ICML 2026).
 
 <p align="center">
   <img src="assets/main_figure.png" width="90%">
