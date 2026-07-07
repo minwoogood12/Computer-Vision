@@ -20,32 +20,22 @@ Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10,
 PyTorch 2.3.1, and CUDA 12.1.
 
 ```bash
+# 1. Create the environment and install PyTorch (CUDA 12.1)
 conda create -n rpm python=3.10 -y
 conda activate rpm
-
-# Install PyTorch built for CUDA 12.1 (see https://pytorch.org for other versions).
 pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
-```
 
-### Install the remaining dependencies
-
-```bash
+# 2. Install the remaining dependencies
 pip install -r requirements.txt
-```
 
-### Install Mamba (predictive-memory dynamics)
-
-```bash
+# 3. Install Mamba (predictive-memory dynamics)
 pip install packaging ninja setuptools wheel
 pip install causal-conv1d==1.4.0 --no-build-isolation --no-deps
 pip install mamba-ssm==2.2.2     --no-build-isolation --no-deps
-```
 
-### Install the `sam2` package
-
-```bash
+# 4. Install the `sam2` package
 cd sam2
-pip install -e .    
+pip install -e .
 cd ..
 ```
 
