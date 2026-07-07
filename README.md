@@ -17,25 +17,36 @@
 ## Installation
 
 Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10 and
-CUDA 12.1.
+CUDA 12.x.
 
 ```bash
-# 1. Create the environment and install PyTorch (CUDA 12.1)
 conda create -n rpm python=3.10 -y
 conda activate rpm
+
+# Install PyTorch matching your CUDA version (see https://pytorch.org).
+# Example for CUDA 12.1:
 pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
+```
 
-# 2. Install the remaining dependencies
+### Install the remaining dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-# 3. Install Mamba (predictive-memory dynamics)
+### Install Mamba (predictive-memory dynamics)
+
+```bash
 pip install packaging ninja setuptools wheel
 pip install causal-conv1d==1.4.0 --no-build-isolation --no-deps
 pip install mamba-ssm==2.2.2     --no-build-isolation --no-deps
+```
 
-# 4. Install the `sam2` package
+### Install the `sam2` package
+
+```bash
 cd sam2
-pip install -e .
+pip install -e .    
 cd ..
 ```
 
@@ -57,34 +68,12 @@ LaSOT/
 LaSOT_ext/                       # same layout as LaSOT
 ```
 
-Training uses video-segmentation data (SA-V, optionally MOSE / YouTube-VOS 2019),
-laid out as:
-
-```
-sa-v/
-└── sav_train/
-    └── <video>/
-        ├── <video>.jpg / .png ...        # extracted frames
-        └── <video>_manual.json           # SA-V mask annotations
-
-mose/
-└── train/
-    ├── JPEGImages/<video>/00000.jpg ...
-    └── Annotations/<video>/00000.png ... # palette masks
-
-VOS-2019/                                 # YouTube-VOS 2019
-├── JPEGImages/<video>/00000.jpg ...
-└── Annotations/<video>/00000.png ...     # palette masks
-```
-
-Edit the corresponding `img_folder` / `gt_folder` paths in
-`sam2/sam2/configs/sam2.1_training/sam2.1_hiera_b+_RPM_train.yaml` (`dataset.img_folder`,
-`dataset.mose_img_folder`, `dataset.vos2019_img_folder`, and their `*_gt_folder`
-counterparts) to point at these directories.
+Training uses video-segmentation data (SA-V, optionally MOSE / VOS-2019). Edit
+the paths in `sam2/sam2/configs/sam2.1_training/sam2.1_hiera_b+_RPM_train.yaml`.
 
 ### Checkpoints
 
-Weights live under `sam2/checkpoints/` (git-ignored).
+Weights live under `sam2/checkpoints/`.
 
 Download the base SAM 2.1 weights (needed to initialize training and for the
 SAM2 backbone):
@@ -104,7 +93,7 @@ cd ../..
 
 ## Training
 
-RPM training **only learns the predictive prompt (FPM)** — the SAM2 backbone is
+RPM training **only learns the predictive-memory prompt** — the SAM2 backbone is
 frozen. Run from the `sam2/` directory:
 
 ```bash
@@ -138,18 +127,18 @@ python scripts/main_inference_lasot.py \
 ### LaSOT / LaSOT-ext (chunked across GPUs)
 
 ```bash
-# LaSOT-ext, 4 processes / 4 GPUs
+# LaSOT, 4 processes / 4 GPUs
 for i in 0 1 2 3; do
-  CUDA_VISIBLE_DEVICES=$i python scripts/main_inference_chunk_ext.py \
-      --data_root /path/to/LaSOT_ext \
+  CUDA_VISIBLE_DEVICES=$i python scripts/main_inference_chunk_lasot.py \
+      --data_root /path/to/LaSOT \
       --checkpoint sam2/checkpoints/rpm_hiera_b+.pt \
-      --config configs/rpm/lasotext/sam2.1_hiera_b+.yaml \
-      --output results/lasot_ext --chunk_idx $i --num_chunks 4 &
+      --config configs/rpm/lasot/sam2.1_hiera_b+.yaml \
+      --output results/lasot --chunk_idx $i --num_chunks 4 &
 done
 wait
 ```
 
-`main_inference_chunk_lasot.py` is the LaSOT counterpart (same arguments).
+`main_inference_chunk_lasot_ext.py` is the LaSOT-ext counterpart (same arguments).
 Each script writes one `<video>.txt` per sequence (`x,y,w,h` per frame).
 
 ---
@@ -175,10 +164,3 @@ This codebase is built on [SAM 2](https://github.com/facebookresearch/sam2). The
 long-term memory management strategy follows
 [HiM2SAM](https://github.com/LouisFinner/HiM2SAM); the predictive-memory dynamics
 are implemented with [Mamba](https://github.com/state-spaces/mamba).
-
----
-
-## License
-
-This project is released under the [Apache 2.0 License](LICENSE), consistent
-with the SAM 2 codebase it builds upon.
