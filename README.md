@@ -6,7 +6,7 @@
 
 <p align="center">
   <sup>1</sup>HCI Lab, College of Computer Science, Kookmin University, Seoul, Korea
-</p>
+</p>그
 
 <p align="center">
   <img src="assets/main_figure.png" width="90%">
