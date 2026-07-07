@@ -9,10 +9,6 @@
 </p>
 
 <p align="center">
-  <i>International Conference on Machine Learning (ICML), 2026</i>
-</p>
-
-<p align="center">
   <img src="assets/main_figure.png" width="90%">
 </p>
 
