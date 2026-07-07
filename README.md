@@ -16,9 +16,6 @@
 
 ## Installation
 
-Requires a CUDA GPU (Mamba kernels are CUDA-only). Tested with Python 3.10,
-PyTorch 2.3.1, and CUDA 12.1.
-
 ```bash
 # 1. Create the environment and install PyTorch (CUDA 12.1)
 conda create -n rpm python=3.10 -y
