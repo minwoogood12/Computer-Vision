@@ -1,10 +1,16 @@
-# Memory as Dynamics: Learning Reliability-Guided Predictive Models for Online Video Perception
+<h1 align="center">Memory as Dynamics: Learning Reliability-Guided Predictive Models for Online Video Perception</h1>
 
-**Minwoo Kim, [Sang Min Yoon](https://scholar.google.com/citations?user=V6HVW-QAAAAJ&hl=ko&oi=ao)**
+<p align="center">
+  <b>Minwoo Kim</b><sup>1</sup>, <b><a href="https://scholar.google.com/citations?user=V6HVW-QAAAAJ&hl=ko&oi=ao">Sang Min Yoon</a></b><sup>1</sup>
+</p>
 
-HCI Lab, College of Computer Science, Kookmin University, Seoul, Korea
+<p align="center">
+  <sup>1</sup>HCI Lab, College of Computer Science, Kookmin University, Seoul, Korea
+</p>
 
-Official implementation of **RPM** (ICML 2026).
+<p align="center">
+  Official implementation of <b>RPM</b> (ICML 2026).
+</p>
 
 <p align="center">
   <img src="assets/main_figure.png" width="90%">
